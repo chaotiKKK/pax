@@ -418,6 +418,19 @@ export class GalaxyView {
     });
   }
 
+  refreshFleetColors(): void {
+    if (!this.game) return;
+    for (const fleet of this.game.fleets) {
+      const node = this.fleetNodes.get(fleet.id);
+      if (!node) continue;
+      const color = FACTIONS_BY_ID[fleet.owner].color;
+      const marker = node.group.children[0] as THREE.Mesh | undefined;
+      if (marker && marker.material instanceof THREE.MeshBasicMaterial) marker.material.color.setHex(color);
+      const halo = node.group.children[1] as THREE.Sprite | undefined;
+      if (halo && halo.material instanceof THREE.SpriteMaterial) halo.material.color.setHex(color);
+    }
+  }
+
   setSelection(systemId: number | null): void {
     this.targetSel = systemId;
     for (const [id, node] of this.nodes) {

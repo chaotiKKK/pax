@@ -30,6 +30,7 @@ import {
 } from '../sim';
 import type { Branch, BuildingId, FactionId, Fleet, Game, Planet, ShipId, StarSystem } from '../types';
 import {
+  applyIdentityToFaction,
   archStyle,
   bindIdentityEditor,
   crestFor,
@@ -38,6 +39,7 @@ import {
   loadIdentity,
   refreshIdentityEditor,
   styleGlyph,
+  techLabel,
 } from './identity';
 
 export type TabId = 'sector' | 'empire' | 'research' | 'diplomacy';
@@ -70,6 +72,7 @@ export interface HudActions {
   toggleAudio(): void;
   lanHost?(): void;
   lanJoin?(): void;
+  identityChanged?(): void;
 }
 
 const SHORT_CLASS: Record<ShipId, string> = Object.fromEntries(
@@ -167,6 +170,7 @@ export class Hud {
         </div>
         <div class="topbar-center" id="topbar-center"></div>
         <div class="topbar-right">
+          <button class="icon-btn" data-act="identity" title="Reichsidentität — Name, Farben, Banner, Baustil">◈</button>
           <button class="icon-btn" data-act="arsenal" title="Arsenal — Schiffsdatenbank">⌖</button>
           <button class="icon-btn" data-act="audio" title="Ton umschalten" id="audio-btn">♪</button>
           <button class="icon-btn" data-act="help" title="Handbuch">?</button>
@@ -511,7 +515,8 @@ export class Hud {
         })()
       : `<p class="sub">Bauleiste frei.</p>`;
 
-    const archSkin = loadIdentity().style;
+    const skin = loadIdentity();
+    const archSkin = skin.style;
     const buildings = BUILDING_ORDER.map((b) => {
       const d = BUILDINGS[b];
       const locked = !buildingUnlocked(b, (br) => techTier(g, g.player, br));
@@ -549,7 +554,7 @@ export class Hud {
       ${queueProgress}
       <div class="rule"></div>
       <h3 class="block-title">Bauwesen <span>${archStyle(loadIdentity().style).name} · ${nf(g.empires[g.player].alloy)} ⛭</span></h3>
-      <div class="building-grid">${buildings}</div>
+      <div class="building-grid" data-style="${skin.style}" style="--ie-accent:${skin.accent};--ie-secondary:${skin.secondary}">${buildings}</div>
       <h3 class="block-title">Werft <span>${p.buildings.shipyard ? 'bereit' : 'nicht vorhanden'}</span></h3>
       <div style="display:flex;flex-direction:column;gap:6px">${ships}</div>`;
   }
@@ -591,6 +596,7 @@ export class Hud {
         <div class="eyebrow">Reichsübersicht</div>
         <h2>${FACTIONS_BY_ID[g.player].name}</h2>
         <p class="sub">${FACTIONS_BY_ID[g.player].lore}</p>
+        <div class="btn-row" style="margin-top:8px"><button class="btn btn-sm" data-act="identity">Identität bearbeiten</button></div>
       </div>
       <div class="rule"></div>
       <h3 class="block-title">Haushalt <span>pro Zyklus</span></h3>
@@ -608,6 +614,7 @@ export class Hud {
         <dt>Einkommen</dt><dd>${Math.round(mods.income * 100)} %</dd>
         <dt>Forschung</dt><dd>${Math.round(mods.research * 100)} %</dd>
         <dt>Antrieb</dt><dd>${Math.round(mods.speed * 100)} %</dd>
+        <dt>Hauslehre</dt><dd>${techLabel(loadIdentity().tech)}</dd>
       </div>
       <div class="rule"></div>
       <h3 class="block-title">Kolonien <span>${colonies.length}</span></h3>
@@ -631,11 +638,12 @@ export class Hud {
   // ---------------------------------------------------------------- research
   private researchHtml(g: Game): string {
     const emp = g.empires[g.player];
+    const ident = loadIdentity();
     return `
       <div class="panel-head">
         <div class="eyebrow">Forschung</div>
         <h2>${BRANCH_ORDER.length} Pfade</h2>
-        <p class="sub">Technikstil: <b style="color:var(--ink)">${archStyle(loadIdentity().style).sigil} ${archStyle(loadIdentity().style).name}</b> · Jeder der ${BRANCH_ORDER.length} Pfade forscht parallel; abgeschlossene Stufen wirken sofort auf alle Schiffe und Kolonien.</p>
+        <p class="sub">Baustil: <b style="color:var(--ink)">${archStyle(ident.style).sigil} ${archStyle(ident.style).name}</b> · Hauslehre: <b style="color:var(--ink)">${techLabel(ident.tech)}</b> · Jeder der ${BRANCH_ORDER.length} Pfade forscht parallel.</p>
       </div>
       <div class="rule"></div>
       ${BRANCH_ORDER.map((b) => {
@@ -645,7 +653,7 @@ export class Hud {
         const active = activeId ? TECH_BY_ID[activeId] : null;
         const pct = active ? Math.min(100, (emp.progress[b] / active.cost) * 100) : 0;
         const next = TECHS_BY_BRANCH[b].find((t) => !emp.techs.includes(t.id));
-        return `<div class="tech-branch" style="--bc:${meta.css}">
+        return `<div class="tech-branch ${ident.tech === b ? 'is-doctrine' : ''}" style="--bc:${meta.css}">
           <div class="tb-head"><span class="tb-name">${meta.name}</span><span class="tb-tier">Stufe ${tier} / ${TECHS_BY_BRANCH[b].length}</span></div>
           <div class="tb-pips">${TECHS_BY_BRANCH[b].map((t) => `<span class="${emp.techs.includes(t.id) ? 'on' : ''}"></span>`).join('')}</div>
           <div class="tb-bar"><i style="width:${pct}%"></i></div>
@@ -789,6 +797,9 @@ export class Hud {
       case 'audio':
         this.actions.toggleAudio();
         break;
+      case 'identity':
+        this.showIdentityEditor();
+        break;
       case 'arsenal':
         this.openExternal?.('arsenal');
         break;
@@ -880,7 +891,27 @@ export class Hud {
       </div>`;
     bindIdentityEditor(this.overlayRoot, (identity) => {
       const btn = this.overlayRoot.querySelector('[data-act="start"]') as HTMLElement | null;
-      btn?.style.setProperty('--fc', identity.color);
+      btn?.style.setProperty('--fc', identity.primary);
+    });
+  }
+
+  showIdentityEditor(): void {
+    const g = this.state.game;
+    if (!g) return;
+    this.overlayRoot.innerHTML = `
+      <div class="overlay">
+        <div class="modal identity-modal">
+          <div class="modal-head">
+            <h2>Reich bearbeiten</h2>
+            <button class="btn btn-sm btn-ghost" data-act="close-overlay">Schließen</button>
+          </div>
+          <div class="identity-modal-body">${identityEditorHtml(g.player)}</div>
+        </div>
+      </div>`;
+    bindIdentityEditor(this.overlayRoot, (identity) => {
+      applyIdentityToFaction(g.player, identity);
+      this.render();
+      this.actions.identityChanged?.();
     });
   }
 

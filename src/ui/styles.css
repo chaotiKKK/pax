@@ -933,3 +933,60 @@ h3.block-title span { font-family: var(--mono); font-size: 8.5px; letter-spacing
   .ie-body { grid-template-columns: minmax(0, 1fr); }
   .ie-flag { max-width: 190px; }
 }
+
+/* empire editor v2 — three colours, emblems, banner, architecture, doctrine */
+.identity-modal { width: min(980px, 94vw); }
+.identity-modal-body { padding: 0 18px 16px; overflow: auto; }
+.identity-modal .identity-editor { margin: 0; border: 0; background: none; padding: 0; }
+.ie-body { grid-template-columns: 172px minmax(0, 1fr); gap: 14px; }
+.ie-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ie-flag svg { width: 100%; display: block; }
+.ie-caption { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); line-height: 1.35; }
+.ie-name { display: flex; flex-direction: column; gap: 4px; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.ie-name input { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); color: var(--ink);
+  padding: 7px 9px; font-family: var(--display); font-size: 14px; letter-spacing: 0.06em; }
+.ie-name input:focus { outline: none; border-color: rgba(240, 166, 63, 0.55); }
+.ie-color-row { display: grid; grid-template-columns: 48px 28px minmax(0, 1fr); align-items: center; gap: 6px; }
+.ie-label { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.ie-color-row input[type='color'] { width: 28px; height: 22px; padding: 0; border: 1px solid var(--line-strong); background: none; }
+.ie-swatch { width: 17px; height: 17px; }
+.ie-opts { gap: 3px; }
+.ie-opt { width: 25px; height: 24px; font-size: 12px; }
+.ie-techs .ie-opt { font-size: 13px; }
+.ie-build-preview { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.build-btn.is-preview { cursor: default; opacity: 1; padding: 4px 6px; font-size: 10px; }
+.build-btn.is-preview .cost { font-size: 8px; }
+.ie-hint { margin-top: 8px; }
+
+/* architectural styles change the building card itself, not just its glyph */
+.building-grid[data-style] .build-btn,
+.ie-build-preview[data-style] .build-btn { transition: border-radius 0.15s ease, background 0.15s ease, border-color 0.15s ease; }
+.building-grid[data-style] .build-btn .glyph,
+.ie-build-preview[data-style] .build-btn .glyph { color: var(--ie-accent, var(--amber)); }
+.building-grid[data-style='imperial'] .build-btn,
+.ie-build-preview[data-style='imperial'] .build-btn { border-radius: 0; border-left: 2px solid var(--ie-accent, var(--amber));
+  background: linear-gradient(180deg, rgba(240, 166, 63, 0.09), rgba(0, 0, 0, 0.12)); }
+.building-grid[data-style='organic'] .build-btn,
+.ie-build-preview[data-style='organic'] .build-btn { border-radius: 13px 3px 13px 3px; border-color: rgba(98, 210, 196, 0.38);
+  background: radial-gradient(circle at 15% 0%, rgba(98, 210, 196, 0.18), transparent 65%); }
+.building-grid[data-style='brutalist'] .build-btn,
+.ie-build-preview[data-style='brutalist'] .build-btn { border-radius: 0; border: 2px solid rgba(207, 214, 222, 0.3);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 5px, transparent 5px 10px); }
+.building-grid[data-style='nomad'] .build-btn,
+.ie-build-preview[data-style='nomad'] .build-btn { border-radius: 999px; border-style: dashed; padding-left: 12px;
+  background: linear-gradient(90deg, rgba(169, 139, 240, 0.16), transparent 72%); }
+.building-grid[data-style='sacral'] .build-btn,
+.ie-build-preview[data-style='sacral'] .build-btn { border-radius: 0;
+  clip-path: polygon(50% 0, 100% 12%, 100% 100%, 0 100%, 0 12%);
+  background: linear-gradient(180deg, rgba(240, 166, 63, 0.18), rgba(0, 0, 0, 0.16)); }
+
+/* research branch marked as the house doctrine */
+.tech-branch.is-doctrine { border-color: rgba(240, 166, 63, 0.45); box-shadow: inset 2px 0 0 var(--amber); }
+.tech-branch.is-doctrine .tb-name::after { content: ' · Hauslehre'; color: var(--amber); font-size: 9px; letter-spacing: 0.12em; }
+
+@media (max-width: 860px) {
+  .ie-body { grid-template-columns: minmax(0, 1fr); }
+  .ie-side { flex-direction: row; flex-wrap: wrap; }
+  .ie-flag { max-width: 170px; }
+}

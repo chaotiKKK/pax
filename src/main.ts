@@ -94,6 +94,7 @@ function sync(opts: { world?: boolean; scope?: boolean } = {}): void {
 
 function bootWorld(g: Game): void {
   game = g;
+  applyIdentityToFaction(g.player, loadIdentity());
   const capital = g.empires[g.player].capital;
   const planet = g.systems.flatMap((s) => s.planets).find((p) => p.id === capital);
   ui.system = planet ? planet.systemId : null;
@@ -562,6 +563,7 @@ const actions: HudActions = {
   },
   lanHost: () => lobby.show('host'),
   lanJoin: () => lobby.show('client'),
+  identityChanged: () => galaxy.refreshFleetColors(),
 };
 
 hud = new Hud(uiRoot, actions);
