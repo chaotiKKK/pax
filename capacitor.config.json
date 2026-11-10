@@ -1,0 +1,12 @@
+{
+  "appId": "com.paxaeterna.game",
+  "appName": "Pax Aeterna",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#05070b"
+  },
+  "server": {
+    "androidScheme": "http"
+  }
+}
