@@ -71,6 +71,8 @@ export interface ShipDef {
   hull: number;
   speed: number;
   length: number;
+  /** Authored battle-line length in world units, independent of lore length. */
+  battleLength: number;
   garrison: number;
   colonizer: boolean;
   unlock: string;
@@ -154,6 +156,24 @@ export interface Fleet {
   home: number;
 }
 
+export interface EmpireProfile {
+  shipClass: ShipId;
+  /** Optional Army Editor template used as the starting flotilla. */
+  armyId?: string;
+  traits: string[];
+  government: string;
+  worldview: string;
+  religion: string;
+}
+
+export interface EmpireProfileMods {
+  attack: number;
+  hull: number;
+  income: number;
+  research: number;
+  influence: number;
+}
+
 export interface Empire {
   id: FactionId;
   isPlayer: boolean;
@@ -166,6 +186,10 @@ export interface Empire {
   progress: Record<Branch, number>;
   capital: number;
   eliminated: boolean;
+  /** Founding choices of the player empire; absent on AI empires. */
+  profile?: EmpireProfile;
+  /** Baked-in multipliers of the founding choices, so LAN snapshots agree. */
+  profileMods?: EmpireProfileMods;
 }
 
 export interface LogEntry {

@@ -1,0 +1,600 @@
+{
+  "meta": {
+    "generator": "tools/audio/generate.py",
+    "music": "OGG Vorbis q4, 44.1 kHz stereo; supplied MP3 ambience, 48 kHz stereo",
+    "original": false,
+    "sampleRate": 44100,
+    "sfx": "WAV PCM 16-bit mono"
+  },
+  "motifs": {
+    "ashani": {
+      "bars": 4,
+      "bpm": 92,
+      "file": "music/motif-ashani.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "civic"
+    },
+    "concord": {
+      "bars": 4,
+      "bpm": 92,
+      "file": "music/motif-concord.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "civic"
+    },
+    "drell": {
+      "bars": 4,
+      "bpm": 92,
+      "file": "music/motif-drell.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "civic"
+    },
+    "hollis": {
+      "bars": 4,
+      "bpm": 112,
+      "file": "music/motif-hollis.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "dominion"
+    },
+    "korrath": {
+      "bars": 4,
+      "bpm": 112,
+      "file": "music/motif-korrath.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "dominion"
+    },
+    "lumen": {
+      "bars": 4,
+      "bpm": 92,
+      "file": "music/motif-lumen.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "civic"
+    },
+    "myrr": {
+      "bars": 4,
+      "bpm": 84,
+      "file": "music/motif-myrr.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "hive"
+    },
+    "nyx": {
+      "bars": 4,
+      "bpm": 104,
+      "file": "music/motif-nyx.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "bazaar"
+    },
+    "oryx": {
+      "bars": 4,
+      "bpm": 104,
+      "file": "music/motif-oryx.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "bazaar"
+    },
+    "quorum": {
+      "bars": 4,
+      "bpm": 92,
+      "file": "music/motif-quorum.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "civic"
+    },
+    "sable": {
+      "bars": 4,
+      "bpm": 112,
+      "file": "music/motif-sable.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "dominion"
+    },
+    "sylith": {
+      "bars": 4,
+      "bpm": 104,
+      "file": "music/motif-sylith.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "bazaar"
+    },
+    "tessen": {
+      "bars": 4,
+      "bpm": 92,
+      "file": "music/motif-tessen.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "civic"
+    },
+    "vaal": {
+      "bars": 4,
+      "bpm": 112,
+      "file": "music/motif-vaal.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "dominion"
+    },
+    "verrick": {
+      "bars": 4,
+      "bpm": 112,
+      "file": "music/motif-verrick.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "dominion"
+    },
+    "vhel": {
+      "bars": 4,
+      "bpm": 84,
+      "file": "music/motif-vhel.ogg",
+      "gainDb": -2,
+      "loop": false,
+      "theme": "hive"
+    }
+  },
+  "music": {
+    "battle": {
+      "bars": 16,
+      "bpm": 128,
+      "gainDb": 0,
+      "loop": true,
+      "name": "Engagement",
+      "stems": {
+        "assault": "music/battle-assault.ogg",
+        "base": "music/battle-base.ogg"
+      }
+    },
+    "bazaar": {
+      "bars": 16,
+      "bpm": 104,
+      "gainDb": 0,
+      "loop": true,
+      "name": "Glass Bazaar",
+      "stems": {
+        "ambience": "music/deep-sub-bass-drones.mp3",
+        "base": "music/foundation-bazaar-base.ogg",
+        "perc": "music/foundation-bazaar-perc.ogg",
+        "tension": "music/foundation-bazaar-tension.ogg"
+      }
+    },
+    "civic": {
+      "bars": 16,
+      "bpm": 92,
+      "gainDb": 0,
+      "loop": true,
+      "name": "Civic Horizon",
+      "stems": {
+        "ambience": "music/deep-sub-bass-drones.mp3",
+        "base": "music/foundation-civic-base.ogg",
+        "perc": "music/foundation-civic-perc.ogg",
+        "tension": "music/foundation-civic-tension.ogg"
+      }
+    },
+    "defeat": {
+      "bars": 8,
+      "bpm": 108,
+      "file": "music/defeat.ogg",
+      "gainDb": -1,
+      "loop": false
+    },
+    "dominion": {
+      "bars": 16,
+      "bpm": 112,
+      "gainDb": 0,
+      "loop": true,
+      "name": "Iron Dominion",
+      "stems": {
+        "ambience": "music/deep-sub-bass-drones.mp3",
+        "base": "music/foundation-dominion-base.ogg",
+        "perc": "music/foundation-dominion-perc.ogg",
+        "tension": "music/foundation-dominion-tension.ogg"
+      }
+    },
+    "hive": {
+      "bars": 16,
+      "bpm": 84,
+      "gainDb": 0,
+      "loop": true,
+      "name": "Hive Chorus",
+      "stems": {
+        "ambience": "music/deep-sub-bass-drones.mp3",
+        "base": "music/foundation-hive-base.ogg",
+        "perc": "music/foundation-hive-perc.ogg",
+        "tension": "music/foundation-hive-tension.ogg"
+      }
+    },
+    "title": {
+      "name": "Deep Sub-Bass Drones",
+      "bpm": 78,
+      "bars": 12,
+      "loop": true,
+      "gainDb": -1,
+      "stems": {
+        "main": "music/title.ogg",
+        "ambience": "music/deep-sub-bass-drones.mp3"
+      }
+    },
+    "victory": {
+      "bars": 8,
+      "bpm": 108,
+      "file": "music/victory.ogg",
+      "gainDb": -1,
+      "loop": false
+    }
+  },
+  "sfx": {
+    "apply": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/apply.wav"
+      ],
+      "gainDb": -10
+    },
+    "battle_alarm": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/battle_alarm.wav"
+      ],
+      "gainDb": -7
+    },
+    "battle_retreat": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/battle_retreat.wav"
+      ],
+      "gainDb": -8
+    },
+    "build_complete": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/build_complete.wav"
+      ],
+      "gainDb": -8
+    },
+    "build_queue": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/build_queue.wav"
+      ],
+      "gainDb": -9
+    },
+    "chat_in": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/chat_in.wav"
+      ],
+      "gainDb": -13
+    },
+    "colonize": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/colonize.wav"
+      ],
+      "gainDb": -8
+    },
+    "crest": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/crest.wav"
+      ],
+      "gainDb": -11
+    },
+    "cycle_stamp": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/cycle_stamp.wav"
+      ],
+      "gainDb": -6
+    },
+    "cycle_sweep": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/cycle_sweep.wav"
+      ],
+      "gainDb": -9
+    },
+    "diplo_alliance": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/diplo_alliance.wav"
+      ],
+      "gainDb": -8
+    },
+    "diplo_gift": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/diplo_gift.wav"
+      ],
+      "gainDb": -9
+    },
+    "diplo_pact": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/diplo_pact.wav"
+      ],
+      "gainDb": -9
+    },
+    "diplo_peace": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/diplo_peace.wav"
+      ],
+      "gainDb": -9
+    },
+    "diplo_reject": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/diplo_reject.wav"
+      ],
+      "gainDb": -9
+    },
+    "diplo_war": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/diplo_war.wav"
+      ],
+      "gainDb": -7
+    },
+    "disconnect": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/disconnect.wav"
+      ],
+      "gainDb": -9
+    },
+    "explosion_large": {
+      "bus": "sfx",
+      "cooldownMs": 180,
+      "files": [
+        "sfx/explosion_large_1.wav",
+        "sfx/explosion_large_2.wav"
+      ],
+      "gainDb": -3
+    },
+    "explosion_small": {
+      "bus": "sfx",
+      "cooldownMs": 120,
+      "files": [
+        "sfx/explosion_small_1.wav",
+        "sfx/explosion_small_2.wav"
+      ],
+      "gainDb": -5
+    },
+    "fleet_select": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/fleet_select.wav"
+      ],
+      "gainDb": -10
+    },
+    "impact_hull": {
+      "bus": "sfx",
+      "cooldownMs": 55,
+      "files": [
+        "sfx/impact_hull_1.wav",
+        "sfx/impact_hull_2.wav"
+      ],
+      "gainDb": -5
+    },
+    "impact_shield": {
+      "bus": "sfx",
+      "cooldownMs": 55,
+      "files": [
+        "sfx/impact_shield_1.wav",
+        "sfx/impact_shield_2.wav"
+      ],
+      "gainDb": -7
+    },
+    "insufficient": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/insufficient.wav"
+      ],
+      "gainDb": -11
+    },
+    "lan_join": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/lan_join.wav"
+      ],
+      "gainDb": -10
+    },
+    "lan_ready": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/lan_ready.wav"
+      ],
+      "gainDb": -10
+    },
+    "move_order": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/move_order.wav"
+      ],
+      "gainDb": -10
+    },
+    "planet_select": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/planet_select.wav"
+      ],
+      "gainDb": -11
+    },
+    "research_complete": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/research_complete.wav"
+      ],
+      "gainDb": -8
+    },
+    "research_start": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/research_start.wav"
+      ],
+      "gainDb": -10
+    },
+    "ship_complete": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/ship_complete.wav"
+      ],
+      "gainDb": -8
+    },
+    "ship_queue": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/ship_queue.wav"
+      ],
+      "gainDb": -9
+    },
+    "swatch": {
+      "bus": "ui",
+      "cooldownMs": 30,
+      "files": [
+        "sfx/swatch.wav"
+      ],
+      "gainDb": -13
+    },
+    "sys_select": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/sys_select.wav"
+      ],
+      "gainDb": -11
+    },
+    "target_lock": {
+      "bus": "sfx",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/target_lock.wav"
+      ],
+      "gainDb": -9
+    },
+    "ui_click": {
+      "bus": "ui",
+      "cooldownMs": 28,
+      "files": [
+        "sfx/ui_click_1.wav",
+        "sfx/ui_click_2.wav"
+      ],
+      "gainDb": -14
+    },
+    "ui_close": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/ui_close.wav"
+      ],
+      "gainDb": -12
+    },
+    "ui_confirm": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/ui_confirm.wav"
+      ],
+      "gainDb": -11
+    },
+    "ui_deny": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/ui_deny.wav"
+      ],
+      "gainDb": -11
+    },
+    "ui_open": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/ui_open.wav"
+      ],
+      "gainDb": -12
+    },
+    "ui_tab": {
+      "bus": "ui",
+      "cooldownMs": 40,
+      "files": [
+        "sfx/ui_tab.wav"
+      ],
+      "gainDb": -13
+    },
+    "ui_toggle_off": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/ui_toggle_off.wav"
+      ],
+      "gainDb": -12
+    },
+    "ui_toggle_on": {
+      "bus": "ui",
+      "cooldownMs": 0,
+      "files": [
+        "sfx/ui_toggle_on.wav"
+      ],
+      "gainDb": -12
+    },
+    "weapon_kinetic": {
+      "bus": "sfx",
+      "cooldownMs": 70,
+      "files": [
+        "sfx/weapon_kinetic_1.wav",
+        "sfx/weapon_kinetic_2.wav"
+      ],
+      "gainDb": -6
+    },
+    "weapon_missile": {
+      "bus": "sfx",
+      "cooldownMs": 90,
+      "files": [
+        "sfx/weapon_missile_1.wav",
+        "sfx/weapon_missile_2.wav"
+      ],
+      "gainDb": -6
+    },
+    "weapon_pulse": {
+      "bus": "sfx",
+      "cooldownMs": 65,
+      "files": [
+        "sfx/weapon_pulse_1.wav",
+        "sfx/weapon_pulse_2.wav"
+      ],
+      "gainDb": -8
+    }
+  },
+  "version": 1
+}

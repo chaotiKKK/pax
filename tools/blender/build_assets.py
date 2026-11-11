@@ -1,7 +1,7 @@
 """
 PAX AETERNA — procedural capital-ship foundry for Blender 5.x
 =============================================================
-Builds the fleet's 3D assets from primitives, kits them with plating,
+Builds all thirteen class hulls from primitives, kits them with plating,
 greebles, radiators, turrets and emissive engine blocks, then exports
 GLB (Y-up, +Y forward in Blender -> -Z forward in three.js) plus a
 studio render per hull for review.
@@ -386,7 +386,7 @@ def build_ark():
     return join_all("ark")
 
 
-def build_station():
+def build_bulwark():
     # horizontal habitat ring, vertical spire — a fixed orbital citadel
     torus("st_ring", (0, 0, 0), 17.0, 2.6, HULL_MID, maj_seg=64, min_seg=16)
     torus("st_ring_trim", (0, 0, 0), 19.2, 0.32, TRIM, maj_seg=64, min_seg=8)
@@ -420,7 +420,187 @@ def build_station():
             a = i * math.pi * 2 / 5 + row * 0.12
             box("st_win_%d_%d" % (i, row), (math.cos(a) * 5.62, math.sin(a) * 5.62, 2.0 + row * 1.4),
                 (0.5, 0.12, 0.55), GLASS, bevel=0.0, rot=(0, 0, a))
-    return join_all("station")
+    return join_all("bulwark")
+
+
+# --------------------------------------------------------------------------
+# class variants — one silhouette per combat hull, not one per model family
+# --------------------------------------------------------------------------
+def build_raider():
+    """Scout-derived predator: forward-swept blades and exposed missile cells."""
+    box("rai_core", (0, -0.2, 0), (2.3, 7.2, 1.15), HULL_MID, bevel=0.12)
+    cone("rai_nose", (0, 5.0, 0), 1.2, 0.05, 4.8, HULL_LIGHT,
+         rot=(-math.pi / 2, 0, 0), verts=5)
+    box("rai_spine", (0, -0.4, 0.66), (0.42, 6.2, 0.22), TRIM, bevel=0.02)
+    sphere("rai_eye", (0, 3.2, 0.48), 0.42, GLASS, 16, 10)
+    for s in (-1, 1):
+        box("rai_blade", (s * 2.25, -0.8, 0.02), (2.8, 4.6, 0.13), HULL_MID,
+            bevel=0.04, rot=(0, 0, math.radians(24 * s)))
+        box("rai_blade_edge", (s * 3.45, -1.8, 0.02), (0.16, 2.0, 0.24), ACCENT, bevel=0.02)
+        box("rai_pod", (s * 1.55, -2.65, -0.35), (1.0, 2.6, 0.72), HULL_DARK, bevel=0.05)
+        for i in range(2):
+            cyl("rai_tube_%d" % i, (s * 1.55, -3.45 + i * 0.8, 0.18), 0.16, 0.95,
+                HULL_LIGHT, rot=(math.pi / 2, 0, 0), verts=8, bevel=0.0)
+        box("rai_vent", (s * 0.62, -4.05, 0.34), (0.24, 1.1, 0.32), ACCENT, bevel=0.02)
+    engine_bank(-4.0, 0.0, 2, 1.15, 0.4, 1.3)
+    windows(-1.8, 1.8, 1.16, 0.38, rows=1, count=5, width=0.28, seed=61)
+    return join_all("raider")
+
+
+def build_frigate():
+    """Corvette-derived escort with a shield halo and paired sensor masts."""
+    box("fri_core", (0, -0.4, 0), (3.0, 15.0, 1.9), HULL_MID, bevel=0.2)
+    cone("fri_prow", (0, 9.4, 0), 1.45, 0.14, 5.4, HULL_LIGHT,
+         rot=(-math.pi / 2, 0, 0), verts=6)
+    box("fri_deck", (0, 1.1, 1.05), (1.8, 9.2, 0.55), HULL_MID, bevel=0.08)
+    box("fri_bridge", (0, 5.1, 1.65), (1.6, 2.6, 0.9), HULL_LIGHT, bevel=0.06)
+    for s in (-1, 1):
+        box("fri_rail", (s * 2.0, -1.4, 0.05), (1.4, 9.6, 0.5), HULL_MID, bevel=0.06)
+        box("fri_rail_trim", (s * 2.05, 2.0, 0.35), (1.0, 1.1, 0.16), ACCENT, bevel=0.02)
+        cyl("fri_mast", (s * 0.8, 3.5, 2.15), 0.10, 3.2, TRIM, verts=8, bevel=0.0)
+        sphere("fri_mast_tip", (s * 0.8, 3.5, 3.8), 0.18, GLOW, 12, 8)
+        cyl("fri_engine", (s * 1.15, -8.0, 0.0), 0.62, 2.5, HULL_LIGHT,
+            rot=(math.pi / 2, 0, 0), verts=16)
+        box("fri_engine_trim", (s * 1.15, -7.5, 0.0), (1.5, 0.35, 0.5), ACCENT, bevel=0.02)
+    torus("fri_shield_ring", (0, 0.5, 0), 4.0, 0.16, GLOW, rot=(math.pi / 2, 0, 0), maj_seg=48, min_seg=8)
+    for s in (-1, 1):
+        box("fri_shield_pylon", (s * 2.35, 0.5, 0.0), (1.45, 0.55, 0.32), TRIM, bevel=0.02)
+    windows(-4.2, 6.2, 1.52, 0.45, rows=2, count=8, width=0.38, seed=62)
+    windows(-4.2, 6.2, -1.52, 0.45, rows=2, count=8, width=0.38, seed=63)
+    return join_all("frigate")
+
+
+def build_destroyer():
+    """Long, narrow spinal-gun hull with outrigger missile rails."""
+    box("des_spine", (0, -1.0, 0), (3.2, 24.0, 1.8), HULL_MID, bevel=0.24)
+    cone("des_prow", (0, 13.5, 0), 1.6, 0.16, 7.5, HULL_LIGHT,
+         rot=(-math.pi / 2, 0, 0), verts=5)
+    box("des_deck", (0, 1.0, 0.95), (2.0, 12.0, 0.5), HULL_MID, bevel=0.06)
+    box("des_bridge", (0, 6.2, 1.6), (1.7, 3.0, 0.8), HULL_LIGHT, bevel=0.05)
+    cyl("des_spinal", (0, 12.0, 0.0), 0.5, 16.0, HULL_LIGHT,
+        rot=(math.pi / 2, 0, 0), verts=16)
+    cyl("des_muzzle", (0, 20.2, 0.0), 0.31, 0.8, ACCENT,
+        rot=(math.pi / 2, 0, 0), verts=12, bevel=0.0)
+    for s in (-1, 1):
+        box("des_rail", (s * 3.15, -3.0, -0.1), (1.15, 16.0, 0.55), HULL_MID, bevel=0.05)
+        box("des_rail_trim", (s * 3.15, 1.0, 0.2), (0.95, 2.6, 0.18), ACCENT, bevel=0.02)
+        for i in range(3):
+            box("des_cell_%d" % i, (s * 3.15, -7.6 + i * 2.2, 0.0), (0.85, 1.0, 0.6), HULL_DARK, bevel=0.02)
+            cyl("des_cell_tube_%d" % i, (s * 3.15, -7.8 + i * 2.2, 0.38), 0.13, 0.32,
+                ENGINE, rot=(math.pi / 2, 0, 0), verts=8, bevel=0.0)
+        fin(-5.8, 0.35, s * 2.4, 1.2, 0)
+        radiator(-9.5, -0.3, s * 2.2, 1.1, 5.2)
+    for i in range(2):
+        turret(4.4 - i * 3.2, 1.45, 0.0, 0.9)
+    windows(-8.0, 8.5, 1.62, 0.42, rows=2, count=8, width=0.32, seed=64)
+    engine_bank(-13.0, 0.0, 4, 1.35, 0.62, 2.0)
+    return join_all("destroyer")
+
+
+def build_carrier():
+    """Wide flight deck, twin open hangar bays, offset island."""
+    box("car_hull", (0, -1.0, 0), (8.4, 24.0, 2.6), HULL_MID, bevel=0.3)
+    box("car_bow", (0, 11.6, -0.1), (7.4, 5.2, 1.9), HULL_LIGHT, bevel=0.24)
+    box("car_deck", (0, -0.5, 1.52), (9.2, 20.0, 0.5), HULL_MID, bevel=0.04)
+    box("car_deck_line", (0, -0.5, 1.82), (0.28, 18.0, 0.08), ACCENT, bevel=0.0)
+    box("car_island", (2.9, 3.0, 2.65), (1.8, 5.0, 2.0), HULL_LIGHT, bevel=0.08)
+    box("car_island_glass", (2.9, 5.2, 2.9), (1.5, 0.2, 0.42), GLASS, bevel=0.0)
+    for s in (-1, 1):
+        box("car_hangar", (s * 4.0, -2.0, -0.1), (2.2, 13.0, 1.8), HULL_DARK, bevel=0.08)
+        box("car_hangar_door", (s * 4.0, -8.55, 0.0), (1.9, 0.22, 1.35), GLOW, bevel=0.0)
+        for i in range(3):
+            box("car_bay_rib_%d" % i, (s * 4.0, -7.2 + i * 3.3, 0.95), (2.35, 0.18, 0.1), TRIM, bevel=0.0)
+        box("car_sponson", (s * 4.8, 2.0, 0.1), (1.2, 11.0, 1.0), HULL_MID, bevel=0.06)
+        box("car_sponson_light", (s * 4.8, 6.0, 0.6), (0.7, 0.5, 0.25), ACCENT, bevel=0.0)
+        fin(-8.5, 0.4, s * 3.2, 1.4, 0)
+    for i in range(3):
+        box("car_launch_%d" % i, ((i - 1) * 2.2, 10.5, 1.82), (0.6, 1.7, 0.1), ACCENT, bevel=0.0)
+    for i in range(5):
+        windows(-8.0, 8.0, 4.25, 0.7, rows=1, count=4, width=0.3, seed=65 + i)
+    engine_bank(-14.0, -0.2, 4, 2.2, 0.9, 2.6)
+    engine_bank(-13.4, 2.0, 2, 2.8, 0.55, 1.8)
+    return join_all("carrier")
+
+
+def build_battleship():
+    """Broadside battleship: low armored prow and six heavy turrets."""
+    box("bat_spine", (0, -1.0, 0), (7.4, 40.0, 3.2), HULL_MID, bevel=0.4)
+    cone("bat_prow", (0, 22.0, 0), 3.3, 0.3, 9.0, HULL_LIGHT,
+         rot=(-math.pi / 2, 0, 0), verts=7)
+    box("bat_armor", (0, 15.0, 1.9), (9.6, 11.0, 2.0), HULL_MID, bevel=0.2)
+    box("bat_bridge", (0, 4.0, 3.0), (4.4, 6.0, 1.3), HULL_LIGHT, bevel=0.1)
+    for s in (-1, 1):
+        box("bat_wing", (s * 5.0, -3.0, 0.0), (4.6, 28.0, 1.5), HULL_MID, bevel=0.18)
+        box("bat_wing_edge", (s * 7.15, -3.0, 0.0), (0.5, 26.0, 0.9), HULL_DARK, bevel=0.04)
+        box("bat_wing_accent", (s * 5.0, 8.0, 0.9), (2.8, 3.2, 0.26), ACCENT, bevel=0.03)
+        for i in range(3):
+            turret(-10.0 + i * 9.0, 1.85, s * 4.3, 1.15)
+        radiator(-18.0, 0.2, s * 6.3, 1.4, 7.0)
+        fin(-14.0, 0.3, s * 3.0, 1.8, 0)
+        box("bat_engine_block", (s * 3.8, -21.0, -0.2), (4.2, 7.0, 2.8), HULL_MID, bevel=0.12)
+    turret(18.0, 2.1, 0, 1.25)
+    windows(-15.0, 16.0, 3.75, 1.3, rows=2, count=12, width=0.5, seed=66)
+    windows(-15.0, 16.0, -3.75, 1.3, rows=2, count=12, width=0.5, seed=67)
+    engine_bank(-23.0, -0.2, 4, 2.4, 1.0, 2.5)
+    return join_all("battleship")
+
+
+def build_titan():
+    """Aeterna citadel: twin towers, a halo ring and four outriggers."""
+    box("tit_spine", (0, -2.0, 0), (9.5, 52.0, 4.0), HULL_MID, bevel=0.55)
+    cone("tit_prow", (0, 30.0, 0), 4.4, 0.4, 12.0, HULL_LIGHT,
+         rot=(-math.pi / 2, 0, 0), verts=8)
+    box("tit_crown", (0, 13.0, 4.2), (7.0, 12.0, 2.5), HULL_MID, bevel=0.2)
+    for s in (-1, 1):
+        cyl("tit_tower", (s * 2.4, 13.0, 6.0), 0.7, 7.0, TRIM, verts=10)
+        cone("tit_tower_tip", (s * 2.4, 13.0, 9.8), 0.7, 0.05, 2.8, TRIM, verts=8)
+        sphere("tit_tower_beacon", (s * 2.4, 13.0, 11.3), 0.24, GLOW, 12, 8)
+        box("tit_outrigger", (s * 9.5, -4.0, 0.2), (6.0, 34.0, 2.0), HULL_MID, bevel=0.18)
+        box("tit_outrigger_edge", (s * 12.2, -4.0, 0.2), (0.6, 32.0, 1.2), HULL_DARK, bevel=0.04)
+        for i in range(2):
+            cyl("tit_cannon_%d" % i, (s * 10.8, 13.0, -0.1 + i * 0.9), 0.42, 13.0,
+                HULL_LIGHT, rot=(math.pi / 2, 0, 0), verts=14)
+            cyl("tit_cannon_muzzle_%d" % i, (s * 10.8, 19.2, -0.1 + i * 0.9), 0.26, 0.8,
+                ACCENT, rot=(math.pi / 2, 0, 0), verts=12, bevel=0.0)
+        box("tit_nacelle", (s * 6.0, -25.0, -0.5), (5.2, 11.0, 3.6), HULL_MID, bevel=0.14)
+        radiator(-23.0, 0.8, s * 10.0, 1.5, 8.0)
+        fin(-18.0, 1.8, s * 4.0, 2.2, 0)
+    torus("tit_halo", (0, -2.0, 0), 13.5, 0.65, TRIM, rot=(math.pi / 2, 0, 0), maj_seg=64, min_seg=10)
+    for i in range(8):
+        a = i * math.pi / 4
+        box("tit_halo_spoke_%d" % i, (math.cos(a) * 7.0, -2.0, math.sin(a) * 7.0),
+            (6.5, 0.35, 0.35), HULL_LIGHT, bevel=0.02, rot=(0, -a, 0))
+    for i in range(4):
+        turret(20.0 - i * 9.0, 2.1, 0, 1.3)
+    windows(-18.0, 18.0, 4.85, 2.0, rows=2, count=16, width=0.65, seed=68)
+    windows(-18.0, 18.0, -4.85, 2.0, rows=2, count=16, width=0.65, seed=69)
+    engine_bank(-31.0, -0.4, 4, 3.4, 1.3, 3.0)
+    engine_bank(-30.0, 2.8, 2, 4.0, 0.85, 2.2)
+    return join_all("titan")
+
+
+def build_lance():
+    """Grav siege hull: exposed ventral cannon and four landing bays."""
+    box("lan_spine", (0, -1.0, 0), (5.4, 30.0, 2.5), HULL_MID, bevel=0.3)
+    cone("lan_prow", (0, 18.0, 0), 2.7, 0.3, 7.0, HULL_LIGHT,
+         rot=(-math.pi / 2, 0, 0), verts=6)
+    box("lan_belly", (0, -1.0, -2.2), (4.6, 18.0, 1.9), HULL_MID, bevel=0.16)
+    cyl("lan_grav", (0, 4.0, -3.2), 0.72, 18.0, HULL_LIGHT,
+        rot=(math.pi / 2, 0, 0), verts=18)
+    cyl("lan_grav_muzzle", (0, 12.8, -3.2), 0.45, 0.9, ACCENT,
+        rot=(math.pi / 2, 0, 0), verts=14, bevel=0.0)
+    for s in (-1, 1):
+        box("lan_pod", (s * 4.2, -4.0, -1.0), (3.2, 10.0, 2.8), HULL_MID, bevel=0.16)
+        box("lan_pod_trim", (s * 4.2, 0.0, 0.5), (2.6, 2.0, 0.18), ACCENT, bevel=0.02)
+        for i in range(3):
+            box("lan_bay_%d" % i, (s * 4.2, -7.4 + i * 3.0, -1.0), (2.5, 1.8, 0.18), HULL_DARK, bevel=0.02)
+            box("lan_bay_light_%d" % i, (s * 4.2, -7.4 + i * 3.0, -0.85), (2.2, 0.16, 0.08), GLOW, bevel=0.0)
+        box("lan_pylon", (s * 2.7, 0.0, -0.4), (1.4, 7.0, 0.8), HULL_LIGHT, bevel=0.06)
+    for i in range(2):
+        turret(5.0 - i * 8.0, 1.4, 0, 1.0)
+    windows(-9.0, 10.0, 2.75, 0.7, rows=2, count=9, width=0.4, seed=70)
+    engine_bank(-16.0, -0.4, 4, 1.8, 0.75, 2.3)
+    return join_all("lance")
 
 
 # --------------------------------------------------------------------------
@@ -533,8 +713,9 @@ def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     setup_render()
     init_materials()
-    for builder in (build_scout, build_corvette, build_cruiser,
-                    build_dreadnought, build_ark, build_station):
+    for builder in (build_scout, build_raider, build_corvette, build_frigate,
+                    build_destroyer, build_cruiser, build_carrier, build_battleship,
+                    build_dreadnought, build_titan, build_bulwark, build_lance, build_ark):
         purge_objects()
         obj = builder()
         export(obj, obj.name)

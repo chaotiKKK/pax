@@ -9,8 +9,11 @@ import {
   SHIP_CLASSES,
   SHIP_ORDER,
   TECHS_BY_BRANCH,
+  WIN_COLONIES,
+  WIN_ENERGY,
   WIN_SYSTEMS,
   WIN_TECHS,
+  WIN_TRADE_TIER,
   buildingUnlocked,
   shipUnlocked,
 } from './data';
@@ -30,6 +33,11 @@ import type {
 } from './types';
 
 export const SHIP_IDS: ShipId[] = SHIP_ORDER;
+
+// A single captured capital starts a war of conquest, but only a power that
+// already holds two rival capitals is committed enough to postpone the softer
+// economic, technological and seven-sector victories.
+const CONQUEST_LOCK_CAPITALS = 3;
 
 export interface Mods {
   attack: number;
@@ -51,6 +59,14 @@ export function empireMods(g: Game, id: FactionId): Mods {
     research: f.mods.research,
     influence: 1,
   };
+  const pm = emp.profileMods;
+  if (pm) {
+    m.attack *= pm.attack;
+    m.hull *= pm.hull;
+    m.income *= pm.income;
+    m.research *= pm.research;
+    m.influence *= pm.influence;
+  }
   for (const t of emp.techs) {
     const def = TECH_BY_ID[t];
     if (!def) continue;
@@ -505,10 +521,46 @@ function resolveInvasions(g: Game, sys: StarSystem): void {
         refreshOwner(sys);
         revealFor(g, f.owner);
         log(g, `${planet.name} fällt an die ${FACTIONS_BY_ID[f.owner].short}. ${FACTIONS_BY_ID[old].short} verliert die Kolonie.`, 'war');
+        // A capital is the political existence of a power, not just another
+        // colony. Losing it forces capitulation, transferring the remaining
+        // worlds and ending the rival. This makes a real conquest route
+        // possible before the softer 7-sector hegemony threshold takes over.
+        if (planet.id === g.empires[old]?.capital) {
+          capitulate(g, old, f.owner);
+        }
       }
       break;
     }
   }
+}
+
+function capitulate(g: Game, loser: FactionId, winner: FactionId): void {
+  const empire = g.empires[loser];
+  if (!empire || !empire.alive || loser === winner) return;
+  empire.alive = false;
+  empire.eliminated = true;
+  for (const system of g.systems) {
+    let changed = false;
+    for (const planet of system.planets) {
+      if (planet.owner !== loser) continue;
+      planet.owner = winner;
+      planet.siege = 0;
+      planet.queue = null;
+      planet.progress = 0;
+      changed = true;
+    }
+    if (changed) refreshOwner(system);
+  }
+  g.fleets = g.fleets.filter((fleet) => fleet.owner !== loser);
+  logisticsCapitulation(g, loser, winner);
+}
+
+function logisticsCapitulation(g: Game, loser: FactionId, winner: FactionId): void {
+  log(
+    g,
+    `${FACTIONS_BY_ID[loser].short} kapituliert vor der ${FACTIONS_BY_ID[winner].short}; alle verbliebenen Welten wechseln den Herrscher.`,
+    'war',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -591,9 +643,20 @@ function moveFleets(g: Game): void {
   }
 }
 
+function aiResearchFocus(g: Game, id: FactionId): Branch[] {
+  const mods = empireMods(g, id);
+  // Four branches per doctrine keeps the 48-tech race comparable, while the
+  // actual mix now follows the empire's strengths instead of every AI picking
+  // the same civic/flux/vector/aegis build.
+  if (mods.attack >= 1.2) return ['civic', 'flux', 'command', 'aegis'];
+  if (mods.income >= 1.15) return ['civic', 'econ', 'flux', 'vector'];
+  if (mods.research >= 1.15) return ['civic', 'void', 'flux', 'vector'];
+  return ['civic', 'aegis', 'flux', 'command'];
+}
+
 function aiResearch(g: Game, id: FactionId): void {
   const emp = g.empires[id];
-  const priority: Branch[] = ['civic', 'flux', 'vector', 'aegis'];
+  const priority = aiResearchFocus(g, id);
   for (const b of priority) {
     if (emp.active[b]) continue;
     const next = TECHS_BY_BRANCH[b].find((t) => !emp.techs.includes(t.id));
@@ -608,7 +671,10 @@ function aiBuild(g: Game, id: FactionId): void {
   const mods = empireMods(g, id);
   const free = colonies.filter((p) => !p.queue);
   if (!free.length) return;
-  const target = free[0];
+  // A newly founded colony has no shipyard yet. Prefer the home yard for ships
+  // so arks do not get queued on a world that cannot build them.
+  const target = free.find((p) => p.buildings.shipyard > 0) ?? free[0];
+  const shipyardTarget = free.find((p) => p.buildings.shipyard > 0) ?? null;
 
   if (target.buildings.shipyard === 0) {
     if (emp.alloy > BUILDINGS.shipyard.alloy + 40) queueBuilding(g, target.id, 'shipyard');
@@ -616,22 +682,37 @@ function aiBuild(g: Game, id: FactionId): void {
   }
   const wantArk = colonies.length < 5 && !g.fleets.some((f) => f.owner === id && f.ships.ark > 0) &&
     !colonies.some((p) => p.queue?.kind === 'ship' && p.queue.id === 'ark');
-  if (wantArk && canBuildShip(g, id, 'ark') && emp.alloy > 320) {
-    queueShip(g, target.id, 'ark');
+  if (wantArk && canBuildShip(g, id, 'ark')) {
+    const arkCost = SHIP_CLASSES.ark.alloy;
+    if (emp.alloy >= arkCost && shipyardTarget) {
+      queueShip(g, shipyardTarget.id, 'ark');
+    }
+    // Keep the alloy for the colony ship instead of spending it on escorts.
     return;
+  }
+  // Trade empires use their income advantage to build markets instead of
+  // spending every surplus on another escort. This gives the economic victory
+  // a real AI path rather than making it a player-only option.
+  if (mods.income >= 1.15 && canBuildBuilding(g, id, 'market') && target.buildings.market < 3) {
+    if (emp.alloy >= BUILDINGS.market.alloy + 80) {
+      queueBuilding(g, target.id, 'market');
+      return;
+    }
   }
   const roll = Math.random();
   if (emp.alloy > 520 && roll < 0.45) {
     queueBuilding(g, target.id, colonyCap(target) - target.pop < 2 ? 'habitat' : 'lab');
     return;
   }
-  if (emp.alloy > 260) {
+  if (emp.alloy > 260 && shipyardTarget) {
     const options: ShipId[] = ['corvette', 'corvette', 'cruiser'];
-    const cls = options[Math.floor(Math.random() * options.length)];
-    if (canBuildShip(g, id, cls)) {
-      queueShip(g, target.id, cls);
-      return;
+    for (const cls of ['destroyer', 'lance'] as ShipId[]) {
+      if (!canBuildShip(g, id, cls)) continue;
+      if (emp.alloy < SHIP_CLASSES[cls].alloy) continue;
+      options.push(cls);
     }
+    const cls = options[Math.floor(Math.random() * options.length)];
+    if (canBuildShip(g, id, cls) && queueShip(g, shipyardTarget.id, cls).ok) return;
   }
   if (emp.alloy > 200) {
     const b: BuildingId = target.buildings.mine < 2 ? 'mine' : target.buildings.reactor < 2 ? 'reactor' : 'lab';
@@ -664,14 +745,30 @@ function aiFleets(g: Game, id: FactionId): void {
         continue;
       }
     }
-    // 2) war: strike the weakest reachable enemy system
+    // 2) war: hold an enemy colony orbit and finish the siege before moving on
     if (enemyIds.length) {
+      const current = g.systems[f.system];
+      if (current.planets.some((p) => p.owner && enemyIds.includes(p.owner))) continue;
       const power = fleetPower(g, f, mods);
-      const targets = g.systems.filter((s) => s.owner && enemyIds.includes(s.owner) && s.explored[id]);
+      // Target by planet ownership, not only by sector ownership: a contested
+      // sector can have a hostile colony while its nominal owner is neutral.
+      const targets = g.systems.filter(
+        (s) => s.explored[id] && s.planets.some((p) => p.owner && enemyIds.includes(p.owner)),
+      );
       const scored = targets
-        .map((s) => ({ s, d: pathTo(g, f.system, s.id)?.length ?? 99, def: defenseOfSystem(s).hull }))
+        .map((s) => {
+          const capital = s.planets.some(
+            (p) => p.owner && enemyIds.includes(p.owner) && g.empires[p.owner].capital === p.id,
+          );
+          return {
+            s,
+            d: pathTo(g, f.system, s.id)?.length ?? 99,
+            def: defenseOfSystem(s).hull,
+            capital,
+          };
+        })
         .filter((t) => t.d < 90)
-        .sort((a, b) => a.def - b.def);
+        .sort((a, b) => Number(b.capital) - Number(a.capital) || a.def - b.def);
       const best = scored[0];
       if (best && (best.def < power * 1.1 || Math.random() > 0.55)) {
         orderMove(g, f.id, best.s.id);
@@ -714,7 +811,13 @@ function aiDiplomacy(g: Game, id: FactionId): void {
     if (st === 'peace' && g.cycle > 18 && g.cycle % 11 === 0) {
       const my = systemsOf(g, id).length + g.fleets.filter((f) => f.owner === id).length;
       const their = systemsOf(g, other).length;
-      if (rel < -22 && my > their * 1.25 && Math.random() < 0.6) {
+      // A warlike founding profile must also act warlike, not only factions
+      // whose base attack happens to be high.
+      const aggressive = empireMods(g, id).attack >= 1.05 ? 0.58 : 0.32;
+      // Relations start cool and drift upward; waiting for a negative relation
+      // threshold meant the AI never declared war at all. Compare reachable
+      // strength instead, with a faction-specific appetite for risk.
+      if (my >= their * 1.15 && Math.random() < aggressive) {
         g.states[relationKey(id, other)] = 'war';
         setRelation(g, id, other, rel - 45);
         log(g, `${FACTIONS_BY_ID[id].short} erklärt der ${FACTIONS_BY_ID[other].short} den Krieg.`, 'war');
@@ -787,31 +890,127 @@ export function diplo(
   }
 }
 
-function checkVictory(g: Game): void {
+function checkVictory(g: Game, options: EndCycleOptions = {}): void {
   if (g.victory) return;
   const player = g.empires[g.player];
-  const systems = systemsOf(g, g.player).length;
-  const aliveOthers = FACTION_IDS.filter((o) => o !== g.player && g.empires[o].alive);
-  const playerPlanets = planetsOf(g, g.player).length;
-  const hasArk = g.fleets.some((f) => f.owner === g.player && (f.ships.ark > 0 || f.ships.corvette + f.ships.cruiser + f.ships.dreadnought > 0));
-  const buildingArk = g.systems.some((s) =>
+  const playerSystems = systemsOf(g, g.player).length;    const playerPlanets = planetsOf(g, g.player).length;
+    const playerEnergy = incomeOf(g, g.player).energy;
+    const playerTradeTier = techTier(g, g.player, 'econ');
+    const playerCapitals = capturedRivalCapitals(g, g.player);
+    const playerHasArk = g.fleets.some(
+    (f) => f.owner === g.player && (f.ships.ark > 0 || f.ships.corvette + f.ships.cruiser + f.ships.dreadnought > 0),
+  );
+  const playerBuildingArk = g.systems.some((s) =>
     s.planets.some((p) => p.owner === g.player && p.queue?.kind === 'ship' && p.queue.id === 'ark'),
   );
 
-  if (systems >= WIN_SYSTEMS) {
-    g.victory = { faction: g.player, kind: 'Hegemonie — 15 Sektoren unter einem Banner' };
-  } else if (aliveOthers.length === 0) {
-    g.victory = { faction: g.player, kind: 'Alleinherrschaft — kein Rivale mehr' };
-  } else if (player.techs.length >= WIN_TECHS) {
-    g.victory = { faction: g.player, kind: `Aeterna-Protokoll — ${WIN_TECHS} Forschungen abgeschlossen` };
-  } else if (playerPlanets === 0 && !hasArk && !buildingArk) {
-    g.victory = { faction: g.player, kind: 'Ausgelöscht — die Flotte ist fort, die Kolonien sind verloren' };
-  } else if (g.cycle > MAX_CYCLES) {
+  if (!options.allVictories) {
+    const aliveOthers = FACTION_IDS.filter((o) => o !== g.player && g.empires[o].alive);
+    // Conquest is the clean end state when the last rival is gone. Check it
+    // before the softer thresholds so a total victory is not relabelled as
+    // hegemony merely because the winner also controls seven sectors.
+    if (aliveOthers.length === 0) {
+      g.victory = { faction: g.player, kind: 'Alleinherrschaft — kein Rivale mehr' };
+    } else if (playerSystems >= WIN_SYSTEMS && playerCapitals < CONQUEST_LOCK_CAPITALS) {
+      g.victory = { faction: g.player, kind: `Hegemonie — ${WIN_SYSTEMS} Sektoren unter einem Banner` };
+    } else if (
+      playerCapitals < CONQUEST_LOCK_CAPITALS &&
+      playerPlanets >= WIN_COLONIES &&
+      playerEnergy >= WIN_ENERGY &&
+      playerTradeTier >= WIN_TRADE_TIER
+    ) {
+      g.victory = {
+        faction: g.player,
+        kind: `Wirtschaftshegemonie — ${WIN_COLONIES} Kolonien, ${WIN_ENERGY} Energie und Wirtschaftsstufe ${WIN_TRADE_TIER}`,
+      };
+    } else if (playerCapitals < CONQUEST_LOCK_CAPITALS && player.techs.length >= WIN_TECHS) {
+      g.victory = { faction: g.player, kind: `Aeterna-Protokoll — ${WIN_TECHS} Forschungen abgeschlossen` };
+    } else if (playerPlanets === 0 && !playerHasArk && !playerBuildingArk) {
+      g.victory = { faction: g.player, kind: 'Ausgelöscht — die Flotte ist fort, die Kolonien sind verloren' };
+    } else if (g.cycle > MAX_CYCLES) {
+      g.victory = { faction: g.player, kind: 'Erschöpfung — der Zyklus endet ohne Entscheidung' };
+    }
+    return;
+  }
+
+  // Self-play must let every empire win, not only the nominated player. The
+  // normal single-player path above keeps its original player-centric rules.
+  const alive = FACTION_IDS.filter((id) => g.empires[id].alive);
+  const contenders = alive.map((id) => {
+    const empire = g.empires[id];
+    const planets = planetsOf(g, id);
+    const hasArk = g.fleets.some(
+      (f) => f.owner === id && (f.ships.ark > 0 || f.ships.corvette + f.ships.cruiser + f.ships.dreadnought > 0),
+    );
+    const buildingArk = g.systems.some((s) =>
+      s.planets.some((p) => p.owner === id && p.queue?.kind === 'ship' && p.queue.id === 'ark'),
+    );
+    return {
+      id,
+      empire,
+      planets,
+      hasArk,
+      buildingArk,
+      systems: systemsOf(g, id).length,
+      energy: incomeOf(g, id).energy,
+      tradeTier: techTier(g, id, 'econ'),
+      capitals: capturedRivalCapitals(g, id),
+    };
+  });
+  for (const contender of contenders) {
+    const aliveOthers = alive.filter((id) => id !== contender.id);
+    if (aliveOthers.length === 0) {
+      g.victory = { faction: contender.id, kind: 'Alleinherrschaft — kein Rivale mehr' };
+      return;
+    }
+    if (contender.systems >= WIN_SYSTEMS && contender.capitals < CONQUEST_LOCK_CAPITALS) {
+      g.victory = { faction: contender.id, kind: `Hegemonie — ${WIN_SYSTEMS} Sektoren unter einem Banner` };
+      return;
+    }
+    if (
+      contender.capitals < CONQUEST_LOCK_CAPITALS &&
+      contender.planets.length >= WIN_COLONIES &&
+      contender.energy >= WIN_ENERGY &&
+      contender.tradeTier >= WIN_TRADE_TIER
+    ) {
+      g.victory = {
+        faction: contender.id,
+        kind: `Wirtschaftshegemonie — ${WIN_COLONIES} Kolonien, ${WIN_ENERGY} Energie und Wirtschaftsstufe ${WIN_TRADE_TIER}`,
+      };
+      return;
+    }
+    if (contender.capitals < CONQUEST_LOCK_CAPITALS && contender.empire.techs.length >= WIN_TECHS) {
+      g.victory = { faction: contender.id, kind: `Aeterna-Protokoll — ${WIN_TECHS} Forschungen abgeschlossen` };
+      return;
+    }
+  }
+  // allVictories must not stop at the player's elimination while 14 AI
+  // empires are still alive: that would book a player defeat as if it were a
+  // match-winning victory kind. Keep running the same simulation until an
+  // actual contender wins; only the cycle cap can end it without a winner.
+  if (g.cycle > MAX_CYCLES) {
     g.victory = { faction: g.player, kind: 'Erschöpfung — der Zyklus endet ohne Entscheidung' };
   }
 }
 
-export function endCycle(g: Game): BattleRecord[] {
+function capturedRivalCapitals(g: Game, id: FactionId): number {
+  let count = 0;
+  for (const other of FACTION_IDS) {
+    if (other === id) continue;
+    const capital = planetById(g, g.empires[other].capital);
+    if (capital?.owner === id) count += 1;
+  }
+  return count;
+}
+
+export interface EndCycleOptions {
+  /** Run the ordinary empire AI for the player as well; used by self-play. */
+  aiPlayer?: boolean;
+  /** Let any empire win, not only the nominated player; used by self-play. */
+  allVictories?: boolean;
+}
+
+export function endCycle(g: Game, options: EndCycleOptions = {}): BattleRecord[] {
   if (g.victory) return [];
   g.battles = [];
 
@@ -821,12 +1020,16 @@ export function endCycle(g: Game): BattleRecord[] {
     const inc = incomeOf(g, id);
     emp.energy = Math.max(0, emp.energy + inc.energy - inc.upkeep);
     emp.alloy += inc.alloy;
-    // Influence scales with the size of the realm: 22 controlled sectors is the
-    // advertised victory, so expansion must not stall for lack of a currency.
+    // Influence scales with the size of the realm: seven controlled sectors is
+    // the advertised victory, so expansion must not stall for lack of a currency.
     emp.influence = Math.min(180, emp.influence + (2.2 + systemsOf(g, id).length * 0.45) * empireMods(g, id).influence);
     runResearch(g, id, inc.research);
     advanceColonies(g, id);
-    if (planetsOf(g, id).length === 0 && !g.fleets.some((f) => f.owner === id)) {
+    // A fleet without a colony can only survive if it still carries an ark.
+    // Keeping a lone warship alive created zombie empires that could never
+    // recover, inflated the rival count and prevented clean elimination wins.
+    const hasArk = g.fleets.some((f) => f.owner === id && f.ships.ark > 0);
+    if (planetsOf(g, id).length === 0 && !hasArk) {
       emp.alive = false;
       emp.eliminated = true;
       log(g, `Die ${FACTIONS_BY_ID[id].short} existiert nicht mehr.`, 'bad');
@@ -834,7 +1037,8 @@ export function endCycle(g: Game): BattleRecord[] {
   }
 
   for (const id of FACTION_IDS) {
-    if (!g.empires[id].alive || id === g.player) continue;
+    if (!g.empires[id].alive) continue;
+    if (id === g.player && !options.aiPlayer) continue;
     aiResearch(g, id);
     aiBuild(g, id);
     aiDiplomacy(g, id);
@@ -845,10 +1049,11 @@ export function endCycle(g: Game): BattleRecord[] {
 
   for (const sys of g.systems) {
     const battles = resolveSystemBattles(g, sys);
-    if (battles.length) {
-      g.battles.push(...battles);
-      resolveInvasions(g, sys);
-    }
+    if (battles.length) g.battles.push(...battles);
+    // An undefended colony can be invaded without a fleet battle. The old
+    // battle-only call made conquest impossible when the defender had no ship
+    // in orbit, which left the AI stuck at one or two sectors forever.
+    resolveInvasions(g, sys);
   }
 
   g.fleets = g.fleets.filter((f) => shipCount(f) > 0);
@@ -867,7 +1072,7 @@ export function endCycle(g: Game): BattleRecord[] {
   }
 
   g.cycle += 1;
-  checkVictory(g);
+  checkVictory(g, options);
   return g.battles;
 }
 

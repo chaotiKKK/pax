@@ -1,7 +1,7 @@
 {
   "name": "pax-aeterna",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "description": "Pax Aeterna — a 4X space strategy reimagining with LAN multiplayer, Windows and Android shells",
   "main": "electron/main.mjs",
@@ -11,12 +11,19 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "assets": "python tools/blender/run_assets.py",
+    "audio:generate": "python tools/audio/generate.py",
+    "audio:audit": "python tools/audio/audit.py",
+    "audio:smoke": "node tools/audio/smoke.mjs",
+    "input:smoke": "node tools/input/smoke.mjs",
+    "conquest:test": "node tools/selfplay/conquest-test.mjs",
+    "ui:audit": "node tools/input/audit.mjs",
+    "selfplay": "node tools/selfplay/run.mjs",
     "lan": "node server/relay.mjs",
     "win": "npm run build && electron .",
     "dist:win": "npm run build && electron-builder --win --dir",
     "android:sync": "npm run build && cap sync android",
     "android:open": "cap open android",
-    "android:apk": "npm run build && cap sync android && cd android && ./gradlew assembleDebug"
+    "android:apk": "npm run build && cap sync android && cd android && gradlew.bat assembleDebug"
   },
   "dependencies": {
     "three": "^0.180.0"

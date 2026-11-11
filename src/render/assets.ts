@@ -62,6 +62,7 @@ export async function instantiateShip(
   key: string,
   factionColor: number,
   targetLength: number,
+  options: { groundAlign?: boolean } = {},
 ): Promise<THREE.Group> {
   const source = await loadShip(key);
   const model = source.clone(true);
@@ -78,9 +79,20 @@ export async function instantiateShip(
         clone.emissive = new THREE.Color(factionColor);
         clone.emissiveIntensity = 2.4;
       }
+      if (/hull_(mid|light)/i.test(original.name)) {
+        clone.color.lerp(new THREE.Color(factionColor), 0.12);
+      } else if (/hull_dark/i.test(original.name)) {
+        clone.color.lerp(new THREE.Color(factionColor), 0.07);
+      }
+      if (/trim/i.test(original.name)) {
+        clone.color.lerp(new THREE.Color(factionColor), 0.26);
+      }
       if (/glow|engine/i.test(original.name)) {
+        clone.color.lerp(new THREE.Color(factionColor), 0.45);
+        clone.emissive.lerp(new THREE.Color(factionColor), 0.35);
         clone.emissiveIntensity = 3.2;
       }
+      clone.envMapIntensity = 1.15;
       swapped.set(original, clone);
       next = clone;
     }
@@ -96,9 +108,14 @@ export async function instantiateShip(
   const length = Math.max(size.z, 0.001);
   const scale = targetLength / length;
   model.scale.setScalar(scale);
-  model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+  model.position.set(
+    -center.x * scale,
+    (options.groundAlign ? -box.min.y : -center.y) * scale,
+    -center.z * scale,
+  );
 
   const wrapper = new THREE.Group();
   wrapper.add(model);
+  wrapper.userData.size = new THREE.Vector3(size.x * scale, size.y * scale, size.z * scale);
   return wrapper;
 }

@@ -1,16 +1,35 @@
 import * as THREE from 'three';
-import { FACTIONS_BY_ID, SHIP_CLASSES } from '../data';
-import { getGlowTexture, glowSprite, instantiateShip } from './assets';
+import { FACTIONS_BY_ID, SHIP_CLASSES, SHIP_ORDER } from '../data';
+import { getGlowTexture, glowSprite, instantiateShip, setupEnvironment } from './assets';
 import type { BattleRecord, ShipId } from '../types';
 
-const CLASS_ORDER: ShipId[] = ['dreadnought', 'cruiser', 'corvette', 'scout', 'ark'];
-const VISUAL_LENGTH: Record<ShipId, number> = {
-  dreadnought: 24,
-  cruiser: 15,
-  corvette: 9,
-  scout: 6,
-  ark: 13,
-};
+const CLASS_ORDER: ShipId[] = SHIP_ORDER;
+
+interface ShipVisualProfile {
+  model: string;
+  length: number;
+  signature: string;
+}
+
+// Profiles are built dynamically from the live SHIP_CLASSES / SHIP_ORDER
+// tables on every call — never snapshotted at import time — so ship classes
+// registered later (player Custom designs via registerCustomShips()) are
+// rendered in the cinematic too. The signature embeds the class id so that
+// custom designs sharing a base GLB hull still get a unique visual identity.
+function visualProfileFor(id: ShipId): ShipVisualProfile {
+  const def = SHIP_CLASSES[id];
+  const length = def?.battleLength ?? 8;
+  const model = def?.model ?? 'cruiser';
+  return { model, length, signature: [id, model, length].join('|') };
+}
+
+export interface BattleAudio {
+  battleWeapon(kind: 'pulse' | 'kinetic' | 'missile', pan: number): void;
+  battleImpact(kind: 'shield' | 'hull', pan: number): void;
+  battleExplosion(size: 'small' | 'large', pan: number): void;
+  battleResult(won: boolean): void;
+  setBattleIntensity(level: number): void;
+}
 
 interface ShipVis {
   group: THREE.Group;
@@ -22,21 +41,29 @@ interface ShipVis {
 
 export class BattleView {
   active = false;
+
+  get visualSignatures(): Record<ShipId, string> {
+    return { ...this.signatures };
+  }
+
   private root: HTMLDivElement;
   private canvas: HTMLCanvasElement;
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.OrthographicCamera;
   private ships: ShipVis[] = [];
   private tracers: { line: THREE.Line; life: number; max: number }[] = [];
   private booms: { sprite: THREE.Sprite; life: number; max: number }[] = [];
   private battle: BattleRecord | null = null;
   private elapsed = 0;
+  private lastTickAt = 0;
   private roundIndex = 0;
   private resolved = false;
   private resolveFn: (() => void) | null = null;
   private loading = true;
   private shake = 0;
+  private cameraBase = new THREE.Vector3(0, 150, 330);
+  private viewWidth = 150;
   private aHull = 1;
   private bHull = 1;
   private aHullStart = 1;
@@ -45,8 +72,10 @@ export class BattleView {
   private barB!: HTMLDivElement;
   private logEl!: HTMLDivElement;
   private resultEl!: HTMLDivElement;
+  private registry!: HTMLDivElement;
+  private signatures: Record<ShipId, string> = {};
 
-  constructor(host: HTMLElement) {
+  constructor(host: HTMLElement, private audio: BattleAudio | null = null) {
     this.root = document.createElement('div');
     this.root.className = 'battle-overlay';
     this.root.innerHTML = `
@@ -82,25 +111,45 @@ export class BattleView {
     this.barB = this.root.querySelector('.is-b .hull-fill') as HTMLDivElement;
     this.logEl = this.root.querySelector('.battle-log') as HTMLDivElement;
     this.resultEl = this.root.querySelector('.battle-result') as HTMLDivElement;
+    this.registry = document.createElement('div');
+    this.registry.className = 'battle-visual-registry';
+    this.registry.hidden = true;
+    this.root.appendChild(this.registry);
 
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 900);
-    this.camera.position.set(0, 22, 104);
+    this.renderer.toneMappingExposure = 1.08;
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 3000);
+    this.camera.position.copy(this.cameraBase);
     this.camera.lookAt(0, 0, 0);
 
-    this.scene.add(new THREE.AmbientLight(0x8fa6c0, 0.9));
-    const key = new THREE.DirectionalLight(0xffe6c4, 2.4);
-    key.position.set(-40, 50, 30);
+    setupEnvironment(this.renderer, this.scene);
+    this.scene.environmentIntensity = 0.55;
+    this.scene.add(new THREE.AmbientLight(0xa9bfd6, 0.68));
+    const key = new THREE.DirectionalLight(0xffe6c4, 3.1);
+    key.position.set(-120, 170, 160);
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x76a8ff, 2.0);
-    rim.position.set(40, -20, -50);
+    const rim = new THREE.DirectionalLight(0x76a8ff, 2.6);
+    rim.position.set(140, -40, -180);
     this.scene.add(rim);
+    const fill = new THREE.DirectionalLight(0xffd2a0, 1.15);
+    fill.position.set(100, -80, 200);
+    this.scene.add(fill);
+
+    // A faint tactical plane makes the common keel line readable: every hull
+    // is grounded on it, so scale and formation stay comparable.
+    const grid = new THREE.GridHelper(450, 18, 0x3a5f86, 0x18283a);
+    const gridMat = grid.material as THREE.LineBasicMaterial;
+    gridMat.transparent = true;
+    gridMat.opacity = 0.14;
+    gridMat.depthWrite = false;
+    grid.position.y = -0.4;
+    this.scene.add(grid);
 
     const stars = this.buildBackdrop();
     this.scene.add(stars);
+    this.resize();
   }
 
   private buildBackdrop(): THREE.Points {
@@ -133,15 +182,24 @@ export class BattleView {
   play(battle: BattleRecord): Promise<void> {
     this.active = true;
     this.battle = battle;
+    this.audio?.setBattleIntensity(0.12);
     this.elapsed = 0;
+    this.lastTickAt = 0;
     this.roundIndex = 0;
     this.resolved = false;
     this.loading = true;
     this.shake = 0;
+    this.camera.position.copy(this.cameraBase);
+    this.camera.lookAt(0, 0, 0);
     this.root.hidden = false;
     this.resultEl.hidden = true;
     this.resultEl.innerHTML = '';
     this.logEl.innerHTML = '';
+    this.registry.replaceChildren();
+    this.signatures = {};
+    delete this.root.dataset.shipClasses;
+    delete this.root.dataset.shipGroups;
+    delete this.root.dataset.shipSignatures;
 
     for (const ship of this.ships) this.scene.remove(ship.group);
     this.ships = [];
@@ -170,8 +228,8 @@ export class BattleView {
     this.bHull = this.bHullStart;
     this.barA.style.width = '100%';
     this.barB.style.width = '100%';
-    (this.root.querySelector('.is-a .side-meta') as HTMLElement).textContent = `${this.shipTotal(battle.aStart)} Schiffe im Verband`;
-    (this.root.querySelector('.is-b .side-meta') as HTMLElement).textContent = `${this.shipTotal(battle.bStart)} Schiffe im Verband`;
+    (this.root.querySelector('.is-a .side-meta') as HTMLElement).textContent = `${this.shipTotal(battle.aStart)} Schiffe im Verband · ${this.classListLabel(battle.aStart)}`;
+    (this.root.querySelector('.is-b .side-meta') as HTMLElement).textContent = `${this.shipTotal(battle.bStart)} Schiffe im Verband · ${this.classListLabel(battle.bStart)}`;
 
     return new Promise((resolve) => {
       this.resolveFn = resolve;
@@ -180,10 +238,18 @@ export class BattleView {
   }
 
   private hullOf(counts: Record<ShipId, number>): number {
-    return CLASS_ORDER.reduce((s, c) => s + counts[c] * SHIP_CLASSES[c].hull, 0);
+    return CLASS_ORDER.reduce((s, c) => s + ((counts as Record<string, number>)[c] ?? 0) * (SHIP_CLASSES[c]?.hull ?? 0), 0);
   }
   private shipTotal(counts: Record<ShipId, number>): number {
-    return CLASS_ORDER.reduce((s, c) => s + counts[c], 0);
+    return CLASS_ORDER.reduce((s, c) => s + ((counts as Record<string, number>)[c] ?? 0), 0);
+  }
+
+  /** Human-readable list of every ship class present on one side. */
+  private classListLabel(counts: Record<ShipId, number>): string {
+    const names = CLASS_ORDER
+      .filter((c) => ((counts as Record<string, number>)[c] ?? 0) > 0)
+      .map((c) => SHIP_CLASSES[c]?.name ?? c);
+    return names.length ? names.join(', ') : 'keine Schiffe';
   }
 
   private async buildFleets(battle: BattleRecord, colorA: string, colorB: string): Promise<void> {
@@ -191,30 +257,56 @@ export class BattleView {
     const plan: { side: 'a' | 'b'; cls: ShipId; color: number; counts: Record<ShipId, number> }[] = [];
     for (const side of ['a', 'b'] as const) {
       const counts = side === 'a' ? battle.aStart : battle.bStart;
-      const present = CLASS_ORDER.filter((c) => counts[c] > 0).slice(0, 4);
+      const present = CLASS_ORDER.filter((c) => ((counts as Record<string, number>)[c] ?? 0) > 0);
       for (const cls of present) plan.push({ side, cls, color: toHex(side === 'a' ? colorA : colorB), counts });
     }
 
     const built = await Promise.all(
       plan.map(async (p) => ({
         ...p,
-        group: await instantiateShip(SHIP_CLASSES[p.cls].model, p.color, VISUAL_LENGTH[p.cls]),
+        group: await instantiateShip(
+          visualProfileFor(p.cls).model,
+          p.color,
+          visualProfileFor(p.cls).length,
+          { groundAlign: true },
+        ),
       })),
     );
     if (!this.active || this.battle !== battle) return;
 
-    const perSide = { a: 0, b: 0 };
-    const totals = { a: plan.filter((p) => p.side === 'a').length, b: plan.filter((p) => p.side === 'b').length };
+    const positions = new Map<THREE.Group, THREE.Vector3>();
+    let widest = 0;
+    for (const side of ['a', 'b'] as const) {
+      const items = built.filter((item) => item.side === side);
+      const yaw = 0.4;
+      const widths = items.map((item) => {
+        const size = item.group.userData.size as THREE.Vector3 | undefined;
+        return size
+          ? Math.max(2.2, Math.abs(size.x * Math.cos(yaw)) + Math.abs(size.z * Math.sin(yaw)))
+          : visualProfileFor(item.cls).length * 0.55;
+      });
+      const gap = 3.4;
+      const total = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, items.length - 1);
+      let cursor = -total / 2;
+      const lineZ = side === 'a' ? -46 : 46;
+      items.forEach((item, index) => {
+        positions.set(item.group, new THREE.Vector3(cursor + widths[index] / 2, 0, lineZ));
+        cursor += widths[index] + gap;
+      });
+      widest = Math.max(widest, total);
+    }
+    this.viewWidth = Math.max(150, widest * 1.18);
+    this.resize();
+
+    const rendered: { cls: ShipId; side: 'a' | 'b'; signature: string }[] = [];
     for (const item of built) {
-      const idx = perSide[item.side]++;
-      const spread = (idx - (totals[item.side] - 1) / 2) * 11;
-      const base = new THREE.Vector3(
-        item.side === 'a' ? -30 : 30,
-        spread * 0.06,
-        spread,
-      );
+      const base = positions.get(item.group);
+      if (!base) continue;
+      const profile = visualProfileFor(item.cls);
       item.group.position.copy(base);
-      item.group.rotation.y = item.side === 'a' ? -Math.PI / 2 : Math.PI / 2;
+      // Both lines face each other along Z, turned slightly toward the camera
+      // so the hull profiles and superstructures stay readable.
+      item.group.rotation.y = item.side === 'a' ? Math.PI + 0.4 : -0.4;
       this.scene.add(item.group);
       this.ships.push({
         group: item.group,
@@ -223,7 +315,23 @@ export class BattleView {
         side: item.side,
         alive: true,
       });
+      rendered.push({ cls: item.cls, side: item.side, signature: profile.signature });
     }
+    this.signatures = Object.fromEntries(
+      rendered.map(({ cls, signature }) => [cls, signature]),
+    ) as Record<ShipId, string>;
+    this.registry.replaceChildren(
+      ...rendered.map(({ cls, side, signature }) => {
+        const marker = document.createElement('span');
+        marker.dataset.shipClass = cls;
+        marker.dataset.side = side;
+        marker.dataset.shipSignature = signature;
+        return marker;
+      }),
+    );
+    this.root.dataset.shipClasses = [...new Set(rendered.map(({ cls }) => cls))].join(' ');
+    this.root.dataset.shipGroups = String(this.ships.length);
+    this.root.dataset.shipSignatures = [...new Set(rendered.map(({ signature }) => signature))].join(',');
     this.loading = false;
   }
 
@@ -276,7 +384,13 @@ export class BattleView {
 
   tick(dt: number): void {
     if (!this.active) return;
-    this.elapsed += dt;
+    // The render loop caps dt to keep movement stable. A software-rendered
+    // battle must not run in slow motion, so the cinematic clock also follows
+    // wall time and catches up after a slow frame or a hidden window.
+    const now = performance.now();
+    const wallDt = this.lastTickAt ? (now - this.lastTickAt) / 1000 : dt;
+    this.lastTickAt = now;
+    this.elapsed += Math.max(dt, Math.min(1, wallDt));
     this.shake = Math.max(0, this.shake - dt * 1.6);
 
     const battle = this.battle;
@@ -293,6 +407,8 @@ export class BattleView {
             (round.bHull / this.bHullStart) * 100,
           )} %`,
         );
+        this.audio?.battleImpact(this.roundIndex % 2 === 0 ? 'shield' : 'hull', this.roundIndex % 2 === 0 ? -0.3 : 0.3);
+        this.audio?.setBattleIntensity(Math.min(1, 0.2 + (this.roundIndex / Math.max(1, battle.rounds.length)) * 0.7));
         const alive = this.ships.filter((s) => s.alive);
         for (let i = 0; i < 7; i++) {
           const attackers = alive.filter((s) => s.side === 'a');
@@ -303,6 +419,7 @@ export class BattleView {
           const from = fromShip.group.position.clone().add(new THREE.Vector3(4, 0, 0));
           const to = toShip.group.position.clone();
           this.spawnTracer(from, to, 0xffc27a);
+          if (i % 2 === 0) this.audio?.battleWeapon(i % 3 === 0 ? 'kinetic' : 'pulse', -0.38);
           const back = defenders[Math.floor(Math.random() * defenders.length)];
           const backAttacker = attackers[Math.floor(Math.random() * attackers.length)];
           this.spawnTracer(
@@ -310,11 +427,14 @@ export class BattleView {
             backAttacker.group.position.clone(),
             0x8fd6ff,
           );
+          if (i % 2 === 1) this.audio?.battleWeapon('missile', 0.38);
         }
         if (this.roundIndex === battle.rounds.length - 1) {
+          this.audio?.battleExplosion('large', 0);
           const loserSide = battle.winner === battle.attacker ? 'b' : 'a';
           for (const s of this.ships) {
             if (s.side === loserSide && Math.random() < 0.7) {
+              this.audio?.battleExplosion('small', s.side === 'a' ? -0.42 : 0.42);
               this.explode(s.group.position.clone(), 0xff9c50);
               s.alive = false;
               s.group.visible = false;
@@ -333,8 +453,9 @@ export class BattleView {
     for (const ship of this.ships) {
       if (!ship.alive) continue;
       const dir = ship.side === 'a' ? 1 : -1;
-      ship.group.position.x = ship.base.x + Math.sin(t * 0.4 + ship.phase) * 1.6 + dir * Math.min(6, t * 0.5);
-      ship.group.position.y = ship.base.y + Math.sin(t * 0.8 + ship.phase) * 0.6;
+      ship.group.position.x = ship.base.x + Math.sin(t * 0.4 + ship.phase) * 0.8;
+      ship.group.position.y = ship.base.y + Math.sin(t * 0.8 + ship.phase) * 0.28;
+      ship.group.position.z = ship.base.z + Math.sin(t * 0.35 + ship.phase) * 0.6 + dir * Math.min(7, t * 0.6);
       ship.group.rotation.z = Math.sin(t * 0.5 + ship.phase) * 0.04;
     }
 
@@ -362,9 +483,9 @@ export class BattleView {
     }
 
     this.camera.position.set(
-      Math.sin(t * 0.12) * 16 + (Math.random() - 0.5) * this.shake * 2,
-      22 + Math.sin(t * 0.2) * 3 + (Math.random() - 0.5) * this.shake * 2,
-      104 + Math.cos(t * 0.1) * 8,
+      this.cameraBase.x + Math.sin(t * 0.1) * 9 + (Math.random() - 0.5) * this.shake * 2,
+      this.cameraBase.y + Math.sin(t * 0.2) * 4 + (Math.random() - 0.5) * this.shake * 2,
+      this.cameraBase.z + Math.cos(t * 0.09) * 8,
     );
     this.camera.lookAt(0, 0, 0);
     this.renderer.render(this.scene, this.camera);
@@ -394,6 +515,7 @@ export class BattleView {
       <button class="btn btn-primary" data-act="battle-continue">Weiter zur Sternenkarte</button>`;
     const btn = this.resultEl.querySelector('button');
     btn?.addEventListener('click', () => this.close());
+    this.audio?.setBattleIntensity(1);
     this.pushLog(winner ? `${winner.short} siegt im Orbit von ${battle.systemName}.` : 'Kein Sieger.');
   }
 
@@ -410,7 +532,11 @@ export class BattleView {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / Math.max(1, h);
+    const viewHeight = this.viewWidth / Math.max(0.1, w / Math.max(1, h));
+    this.camera.left = -this.viewWidth / 2;
+    this.camera.right = this.viewWidth / 2;
+    this.camera.top = viewHeight / 2;
+    this.camera.bottom = -viewHeight / 2;
     this.camera.updateProjectionMatrix();
   }
 }

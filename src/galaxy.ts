@@ -5,11 +5,28 @@ import {
   PLANET_TYPES,
   SHIP_CLASSES,
   SHIP_ORDER,
+  WIN_COLONIES,
+  WIN_ENERGY,
   WIN_SYSTEMS,
+  WIN_TECHS,
+  WIN_TRADE_TIER,
   emptyBuildings,
 } from './data';
 import { makeName, mulberry32 } from './rng';
-import type { Branch, Empire, FactionId, Fleet, Game, Planet, PlanetTypeId, ShipId, StarSystem } from './types';
+import { profileMods, sanitizeProfile } from './profile';
+import { armyTemplateById } from './ships/armies';
+import type {
+  Branch,
+  Empire,
+  EmpireProfile,
+  FactionId,
+  Fleet,
+  Game,
+  Planet,
+  PlanetTypeId,
+  ShipId,
+  StarSystem,
+} from './types';
 
 const SYSTEM_COUNT = 64;
 
@@ -101,7 +118,12 @@ function fleetName(id: FactionId, n: number): string {
   return `${FACTIONS_BY_ID[id].short} ${names[n % names.length]}-${String(100 + n * 7)}`;
 }
 
-export function createGame(seed: number, player: FactionId): Game {
+export function createGame(
+  seed: number,
+  player: FactionId,
+  profile?: EmpireProfile | null,
+  opponentProfiles?: Partial<Record<FactionId, EmpireProfile>> | null,
+): Game {
   const rnd = mulberry32(seed);
   const used = new Set<string>();
   const systems: StarSystem[] = [];
@@ -277,10 +299,42 @@ export function createGame(seed: number, player: FactionId): Game {
     sys.owner = factionId;
     empires[factionId] = makeEmpire(factionId, factionId === player, home.id);
 
-    // starting flotilla
+    // Starting flotilla: a founding profile chooses its flagship. Capital
+    // hulls are deliberately paired with escorts so a cruiser start is not
+    // twice as valuable as a frigate start. The normal game only supplies this
+    // for the player; self-play can also give every opponent its own profile so
+    // race/doctrine matchups stay comparable.
     const ships = emptyShips();
     const hp = emptyHp();
-    ships.corvette = 2;
+    const rawProfile = factionId === player ? profile : opponentProfiles?.[factionId];
+    const startProfile = rawProfile ? sanitizeProfile(rawProfile) : null;
+    if (startProfile) {
+      const army = armyTemplateById(startProfile.armyId);
+      if (army) {
+        // Army Editor template: the player's chosen starting composition.
+        // Scout and Ark are always added below, as for every profile.
+        for (const c of SHIP_ORDER) {
+          const n = army.ships[c] ?? 0;
+          if (n > 0) ships[c] = (ships[c] ?? 0) + n;
+        }
+      } else if (startProfile.shipClass === 'cruiser') {
+        ships.cruiser = 1;
+        ships.corvette = 2;
+      } else {
+        // A frigate pair plus one corvette was materially weaker than a
+        // destroyer pair (86 vs 156 attack, 670 vs 1040 hull), which made the
+        // two frigate profiles systematically underperform. Three frigates
+        // plus the escort bring the opening fleet within the same budget.
+        ships[startProfile.shipClass] = startProfile.shipClass === 'frigate' ? 3 : 2;
+        // The cheaper hulls get a small escort so their opening fleet stays
+        // within the same combat budget as a destroyer pair or a cruiser group.
+        if (startProfile.shipClass !== 'destroyer') ships.corvette = 1;
+      }
+      empires[factionId].profile = startProfile;
+      empires[factionId].profileMods = profileMods(startProfile);
+    } else {
+      ships.corvette = 2;
+    }
     ships.scout = 1;
     ships.ark = 1;
     for (const c of SHIP_ORDER) {
@@ -329,7 +383,7 @@ export function createGame(seed: number, player: FactionId): Game {
     states,
     log: [
       { cycle: 1, kind: 'info', text: `Zyklus 1 — die ${FACTIONS_BY_ID[player].name} tritt in die Leere.` },
-      { cycle: 1, kind: 'info', text: `Ziel: ${WIN_SYSTEMS} Sektoren, alle Pfade oder die Rivalen brechen.` },
+      { cycle: 1, kind: 'info', text: `Ziel: ${WIN_SYSTEMS} Sektoren, ${WIN_TECHS} Forschungen, ${WIN_COLONIES} Kolonien mit ${WIN_ENERGY} Energie und Wirtschaftsstufe ${WIN_TRADE_TIER} oder die Rivalen brechen.` },
     ],
     victory: null,
     battles: [],

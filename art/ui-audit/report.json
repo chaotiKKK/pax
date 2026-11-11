@@ -1,0 +1,453 @@
+{
+  "sizes": [
+    {
+      "surface": "title",
+      "size": "1280x720",
+      "metrics": {
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "scope": {
+          "left": 588.8847045898438,
+          "top": 534.1361694335938,
+          "right": 1191.8790893554688,
+          "bottom": 1568.2459106445312,
+          "width": 602.994384765625,
+          "height": 1034.1097412109375,
+          "clientWidth": 602,
+          "scrollWidth": 602
+        },
+        "scroller": {
+          "left": 0,
+          "top": 0,
+          "right": 1280.4840087890625,
+          "bottom": 720.0907592773438,
+          "width": 1280.4840087890625,
+          "height": 720.0907592773438,
+          "clientWidth": 1264,
+          "clientHeight": 720,
+          "scrollWidth": 1264,
+          "scrollHeight": 1619,
+          "overflowX": "auto",
+          "overflowY": "auto"
+        },
+        "controlCount": 92,
+        "horizontalOverflow": {
+          "document": 0,
+          "scope": 0,
+          "scroller": 0,
+          "controls": 0
+        },
+        "overlaps": [],
+        "labels": [],
+        "labelOverlaps": []
+      },
+      "checks": []
+    },
+    {
+      "surface": "title",
+      "size": "1920x1080",
+      "metrics": {
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "scope": {
+          "left": 908.6427612304688,
+          "top": 721.361083984375,
+          "right": 1511.6371459960938,
+          "bottom": 1755.4708251953125,
+          "width": 602.994384765625,
+          "height": 1034.1097412109375,
+          "clientWidth": 602,
+          "scrollWidth": 602
+        },
+        "scroller": {
+          "left": 0,
+          "top": 0,
+          "right": 1920.0001220703125,
+          "bottom": 1080.13623046875,
+          "width": 1920.0001220703125,
+          "height": 1080.13623046875,
+          "clientWidth": 1903,
+          "clientHeight": 1080,
+          "scrollWidth": 1903,
+          "scrollHeight": 1806,
+          "overflowX": "auto",
+          "overflowY": "auto"
+        },
+        "controlCount": 92,
+        "horizontalOverflow": {
+          "document": 0,
+          "scope": 0,
+          "scroller": 0,
+          "controls": 0
+        },
+        "overlaps": [],
+        "labels": [],
+        "labelOverlaps": []
+      },
+      "checks": []
+    },
+    {
+      "surface": "title",
+      "size": "1024x420",
+      "metrics": {
+        "viewport": {
+          "width": 1024,
+          "height": 420
+        },
+        "scope": {
+          "left": 22.37807273864746,
+          "top": 661.2703857421875,
+          "right": 985.1569423675537,
+          "bottom": 1514.4840698242188,
+          "width": 962.7788696289062,
+          "height": 853.2136840820312,
+          "clientWidth": 961,
+          "scrollWidth": 961
+        },
+        "scroller": {
+          "left": 0,
+          "top": 0,
+          "right": 1024.2420654296875,
+          "bottom": 420.294921875,
+          "width": 1024.2420654296875,
+          "height": 420.294921875,
+          "clientWidth": 1008,
+          "clientHeight": 420,
+          "scrollWidth": 1008,
+          "scrollHeight": 1565,
+          "overflowX": "auto",
+          "overflowY": "auto"
+        },
+        "controlCount": 92,
+        "horizontalOverflow": {
+          "document": 0,
+          "scope": 0,
+          "scroller": 0,
+          "controls": 0
+        },
+        "overlaps": [],
+        "labels": [],
+        "labelOverlaps": []
+      },
+      "checks": []
+    },
+    {
+      "surface": "modal",
+      "size": "1280x720",
+      "metrics": {
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "scope": {
+          "left": 168.96409606933594,
+          "top": 108.90737915039062,
+          "right": 1094.8129119873047,
+          "bottom": 940.6843566894531,
+          "width": 925.8488159179688,
+          "height": 831.7769775390625,
+          "clientWidth": 926,
+          "scrollWidth": 926
+        },
+        "scroller": {
+          "left": 150.96409606933594,
+          "top": 108.90737915039062,
+          "right": 1129.5085906982422,
+          "bottom": 668.9490051269531,
+          "width": 978.5444946289062,
+          "height": 560.0416259765625,
+          "clientWidth": 962,
+          "clientHeight": 560,
+          "scrollWidth": 962,
+          "scrollHeight": 848,
+          "overflowX": "auto",
+          "overflowY": "auto"
+        },
+        "controlCount": 92,
+        "horizontalOverflow": {
+          "document": 0,
+          "scope": 0,
+          "scroller": 0,
+          "controls": 0
+        },
+        "overlaps": [],
+        "labels": [],
+        "labelOverlaps": []
+      },
+      "modal": {
+        "modal": {
+          "width": 979.9962768554688,
+          "height": 619.2703857421875,
+          "top": 50.404541015625,
+          "left": 150.23818969726562,
+          "bottom": 669.6749267578125
+        },
+        "body": {
+          "width": 978.5444946289062,
+          "height": 560.0416259765625,
+          "clientHeight": 560,
+          "scrollHeight": 848,
+          "overflowY": "auto",
+          "flex": "1 1 auto",
+          "minHeight": "0px"
+        },
+        "headVisible": true
+      },
+      "checks": []
+    },
+    {
+      "surface": "modal",
+      "size": "1920x1080",
+      "metrics": {
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        },
+        "scope": {
+          "left": 488.7221374511719,
+          "top": 150.87335205078125,
+          "right": 1431.2666320800781,
+          "bottom": 971.0359497070312,
+          "width": 942.5444946289062,
+          "height": 820.16259765625,
+          "clientWidth": 943,
+          "scrollWidth": 943
+        },
+        "scroller": {
+          "left": 470.7221374511719,
+          "top": 150.87335205078125,
+          "right": 1449.2666320800781,
+          "bottom": 987.0284423828125,
+          "width": 978.5444946289062,
+          "height": 836.1550903320312,
+          "clientWidth": 979,
+          "clientHeight": 836,
+          "scrollWidth": 979,
+          "scrollHeight": 836,
+          "overflowX": "auto",
+          "overflowY": "auto"
+        },
+        "controlCount": 92,
+        "horizontalOverflow": {
+          "document": 0,
+          "scope": 0,
+          "scroller": 0,
+          "controls": 0
+        },
+        "overlaps": [],
+        "labels": [],
+        "labelOverlaps": []
+      },
+      "modal": {
+        "modal": {
+          "width": 979.9962768554688,
+          "height": 895.3837890625,
+          "top": 92.37051391601562,
+          "left": 469.9962463378906,
+          "bottom": 987.7543029785156
+        },
+        "body": {
+          "width": 978.5444946289062,
+          "height": 836.1550903320312,
+          "clientHeight": 836,
+          "scrollHeight": 836,
+          "overflowY": "auto",
+          "flex": "1 1 auto",
+          "minHeight": "0px"
+        },
+        "headVisible": true
+      },
+      "checks": []
+    },
+    {
+      "surface": "modal",
+      "size": "1024x420",
+      "metrics": {
+        "viewport": {
+          "width": 1024,
+          "height": 420
+        },
+        "scope": {
+          "left": 49.45179748535156,
+          "top": 87.92439270019531,
+          "right": 958.0832061767578,
+          "bottom": 919.7013702392578,
+          "width": 908.6314086914062,
+          "height": 831.7769775390625,
+          "clientWidth": 909,
+          "scrollWidth": 909
+        },
+        "scroller": {
+          "left": 31.451797485351562,
+          "top": 87.92439270019531,
+          "right": 992.7788848876953,
+          "bottom": 390.14747619628906,
+          "width": 961.3270874023438,
+          "height": 302.22308349609375,
+          "clientWidth": 945,
+          "clientHeight": 302,
+          "scrollWidth": 945,
+          "scrollHeight": 848,
+          "overflowX": "auto",
+          "overflowY": "auto"
+        },
+        "controlCount": 92,
+        "horizontalOverflow": {
+          "document": 0,
+          "scope": 0,
+          "scroller": 0,
+          "controls": 0
+        },
+        "overlaps": [],
+        "labels": [],
+        "labelOverlaps": []
+      },
+      "modal": {
+        "modal": {
+          "width": 962.7788696289062,
+          "height": 361.4518127441406,
+          "top": 29.421552658081055,
+          "left": 30.725900650024414,
+          "bottom": 390.8733654022217
+        },
+        "body": {
+          "width": 961.3270874023438,
+          "height": 302.22308349609375,
+          "clientHeight": 302,
+          "scrollHeight": 848,
+          "overflowY": "auto",
+          "flex": "1 1 auto",
+          "minHeight": "0px"
+        },
+        "headVisible": true
+      },
+      "checks": []
+    }
+  ],
+  "persistence": {
+    "rendererBefore": 29624,
+    "rendererAfter": 42084,
+    "storedBefore": "{\"name\":\"Aeterna Pruefreich\",\"motto\":\"Der Bund ueberlebt.\",\"primary\":\"#62d2c4\",\"secondary\":\"#2c2740\",\"accent\":\"#d8c7ff\",\"crest\":4,\"pattern\":2,\"style\":\"sacral\",\"tech\":\"void\",\"shipClass\":\"destroyer\",\"traits\":[\"psionic\",\"artificers\"],\"government\":\"technocracy\",\"worldview\":\"militarist\",\"religion\":\"machine\"}",
+    "storedAfter": "{\"name\":\"Aeterna Pruefreich\",\"motto\":\"Der Bund ueberlebt.\",\"primary\":\"#62d2c4\",\"secondary\":\"#2c2740\",\"accent\":\"#d8c7ff\",\"crest\":4,\"pattern\":2,\"style\":\"sacral\",\"tech\":\"void\",\"shipClass\":\"destroyer\",\"traits\":[\"psionic\",\"artificers\"],\"government\":\"technocracy\",\"worldview\":\"militarist\",\"religion\":\"machine\"}",
+    "domBefore": {
+      "name": "Aeterna Pruefreich",
+      "motto": "Der Bund ueberlebt.",
+      "colors": {
+        "primary": "#62d2c4",
+        "secondary": "#2c2740",
+        "accent": "#d8c7ff"
+      },
+      "active": {
+        "crest": [
+          "4"
+        ],
+        "pattern": [
+          "2"
+        ],
+        "style": [
+          "sacral"
+        ],
+        "tech": [
+          "void"
+        ],
+        "ship": [
+          "destroyer"
+        ],
+        "traits": [
+          "psionic",
+          "artificers"
+        ],
+        "government": [
+          "technocracy"
+        ],
+        "worldview": [
+          "militarist"
+        ],
+        "religion": [
+          "machine"
+        ]
+      },
+      "banner": "<svg class=\"ie-banner\" viewBox=\"0 0 160 100\" role=\"img\" aria-label=\"Banner\">\n    <rect x=\"0.5\" y=\"0.5\" width=\"159\" height=\"99\" fill=\"#080c13\" stroke=\"#62d2c4\" stroke-opacity=\"0.45\"></rect>\n    <path d=\"M0 62l40-26 40 26 40-26v18L80 54 40 80 0 54z\" fill=\"#2c2740\" opacity=\"0.6\"></path>\n    <g transform=\"translate(35.6 9) scale(1.85)\"><path d=\"M24 5l4.6 12.4L42 19l-10 8.6L35 41l-11-7-11 7 3-13.4L6 19l13.4-1.6z\" fill=\"none\" stroke=\"#d8c7ff\" stroke-width=\"1.2\"></path>\n        <circle cx=\"24\" cy=\"24\" r=\"2.4\" fill=\"#d8c7ff\"></circle></g>\n    <text x=\"80\" y=\"93\" text-anchor=\"middle\" font-family=\"Bahnschrift, Segoe UI, sans-serif\" font-size=\"9\" letter-spacing=\"2.4\" fill=\"#62d2c4\">AETERNA</text>\n  </svg>"
+    },
+    "domAfter": {
+      "name": "Aeterna Pruefreich",
+      "motto": "Der Bund ueberlebt.",
+      "colors": {
+        "primary": "#62d2c4",
+        "secondary": "#2c2740",
+        "accent": "#d8c7ff"
+      },
+      "active": {
+        "crest": [
+          "4"
+        ],
+        "pattern": [
+          "2"
+        ],
+        "style": [
+          "sacral"
+        ],
+        "tech": [
+          "void"
+        ],
+        "ship": [
+          "destroyer"
+        ],
+        "traits": [
+          "psionic",
+          "artificers"
+        ],
+        "government": [
+          "technocracy"
+        ],
+        "worldview": [
+          "militarist"
+        ],
+        "religion": [
+          "machine"
+        ]
+      },
+      "banner": "<svg class=\"ie-banner\" viewBox=\"0 0 160 100\" role=\"img\" aria-label=\"Banner\">\n    <rect x=\"0.5\" y=\"0.5\" width=\"159\" height=\"99\" fill=\"#080c13\" stroke=\"#62d2c4\" stroke-opacity=\"0.45\"></rect>\n    <path d=\"M0 62l40-26 40 26 40-26v18L80 54 40 80 0 54z\" fill=\"#2c2740\" opacity=\"0.6\"></path>\n    <g transform=\"translate(35.6 9) scale(1.85)\"><path d=\"M24 5l4.6 12.4L42 19l-10 8.6L35 41l-11-7-11 7 3-13.4L6 19l13.4-1.6z\" fill=\"none\" stroke=\"#d8c7ff\" stroke-width=\"1.2\"></path>\n        <circle cx=\"24\" cy=\"24\" r=\"2.4\" fill=\"#d8c7ff\"></circle></g>\n    <text x=\"80\" y=\"93\" text-anchor=\"middle\" font-family=\"Bahnschrift, Segoe UI, sans-serif\" font-size=\"9\" letter-spacing=\"2.4\" fill=\"#62d2c4\">AETERNA</text>\n  </svg>"
+    },
+    "campaign": {
+      "profile": {
+        "shipClass": "destroyer",
+        "traits": [
+          "psionic",
+          "artificers"
+        ],
+        "government": "technocracy",
+        "worldview": "militarist",
+        "religion": "machine"
+      },
+      "mods": {
+        "attack": 1.1336000000000002,
+        "hull": 1.1,
+        "income": 0.997354,
+        "research": 1.2089110000000003,
+        "influence": 0.97
+      },
+      "ships": {
+        "scout": 1,
+        "corvette": 0,
+        "raider": 0,
+        "frigate": 0,
+        "destroyer": 2,
+        "cruiser": 0,
+        "carrier": 0,
+        "battleship": 0,
+        "dreadnought": 0,
+        "titan": 0,
+        "bulwark": 0,
+        "lance": 0,
+        "ark": 1
+      },
+      "player": "concord"
+    },
+    "hud": "REICHSÜBERSICHT AETERNA PRUEFREICH Nach dem Zusammenbruch der irdischen Staatenbünde schrieben neun Orbitalringe die Concordia: eine Republik, die ihre Macht aus Verträgen und Laboren zieht, nicht aus Blut. Der Bund ueberlebt. IDENTITÄT BEARBEITEN HAUSHALT PRO ZYKLUS ENERGIE 10,0 FLOTTENUNTERHALT −0,5 NETTO +9,5 LEGIERUNGEN +8,6 FORSCHUNG +12,9 DOKTRINWERTE AUSGEWOGENE REPUBLIK ANGRIFF 113 % HÜLLE 110 % EINKOMMEN 100 % FORSCHUNG 139 % ANTRIEB 100 % HAUSLEHRE Leere REICHSPROFIL BEI DER GRÜNDUNG GEWÄHLT SCHIFFSTYP Zerstörer „Kestrel“ · Jagdzerstörer REGIERUNG Technokratie WELTANSCHAUUNG Militaristisch RELIGION Maschinenglaube FÄHIGKEITEN Psionisches Erbe · Werftgenies KOLONIEN 1 MALELLE IMALELLE · 7,0 BEV. frei FLOTTEN 1 AETERNA SPEER-100 1× Aufklärung · 2× Jagdzerstörer · 1× Kolonialisierung Kampfkraft 184 · Hülle 91 % DETAILS ZIEL"
+  }
+}

@@ -70,6 +70,7 @@ export class GalaxyView {
   private renderer: THREE.WebGLRenderer;
   private composer: EffectComposer;
   private world = new THREE.Group();
+  private starfield: THREE.Points | null = null;
   private laneUniforms = { uTime: { value: 0 } };
   private laneMesh: THREE.LineSegments | null = null;
   private nodes = new Map<
@@ -77,6 +78,8 @@ export class GalaxyView {
     { group: THREE.Group; ring: THREE.Mesh | null; label: HTMLDivElement; pos: THREE.Vector3 }
   >();
   private fleetNodes = new Map<number, { group: THREE.Group; pos: THREE.Vector3; target: THREE.Vector3 }>();
+  private labelCache = new Map<number, { x: number; y: number; visible: boolean }>();
+  private labelTimer = 0;
   private pickables: THREE.Object3D[] = [];
   private labels: HTMLDivElement;
   private reticle: HTMLDivElement;
@@ -98,7 +101,15 @@ export class GalaxyView {
   private lastX = 0;
   private lastY = 0;
   private downAt = 0;
+  private downX = 0;
+  private downY = 0;
+  private downPointer = 'mouse';
   private idleSpin = 0;
+  private pointers = new Map<number, { x: number; y: number }>();
+  private pinchStartDist = 0;
+  private pinchStartZoom = 300;
+  private tapCandidate = false;
+  private downHit: PickResult | null = null;
 
   onPick: ((r: PickResult | null) => void) | null = null;
   onHover: ((r: PickResult | null) => void) | null = null;
@@ -110,9 +121,11 @@ export class GalaxyView {
     this.renderer.toneMappingExposure = 1.05;
 
     this.camera = new THREE.PerspectiveCamera(46, 1, 0.5, 3000);
+    this.placeCamera();
     this.scene.add(this.world);
     this.scene.add(this.buildNebula());
-    this.scene.add(this.buildStarfield());
+    this.starfield = this.buildStarfield(7000);
+    this.scene.add(this.starfield);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -137,6 +150,7 @@ export class GalaxyView {
     canvas.addEventListener('pointermove', this.handleMove);
     window.addEventListener('pointerup', this.handleUp);
     canvas.addEventListener('wheel', this.handleWheel, { passive: false });
+    canvas.addEventListener('pointercancel', this.handleCancel);
     canvas.addEventListener('pointerleave', () => this.labels.classList.remove('hovering'));
   }
 
@@ -167,8 +181,24 @@ export class GalaxyView {
     return new THREE.Mesh(geo, mat);
   }
 
-  private buildStarfield(): THREE.Points {
-    const count = 7000;
+  /**
+   * Graphics-quality switch (Settings): starfield density + render
+   * resolution. Rebuilds the points cloud; the rest of the scene is kept.
+   */
+  setQuality(quality: 'hoch' | 'mittel' | 'niedrig'): void {
+    const counts = { hoch: 7000, mittel: 3500, niedrig: 1500 } as const;
+    const ratios = { hoch: Math.min(window.devicePixelRatio, 1.75), mittel: Math.min(window.devicePixelRatio, 1.25), niedrig: 1 } as const;
+    if (this.starfield) {
+      this.scene.remove(this.starfield);
+      this.starfield.geometry.dispose();
+      (this.starfield.material as THREE.Material).dispose();
+    }
+    this.starfield = this.buildStarfield(counts[quality]);
+    this.scene.add(this.starfield);
+    this.renderer.setPixelRatio(ratios[quality]);
+  }
+
+  private buildStarfield(count = 7000): THREE.Points {
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
@@ -215,6 +245,7 @@ export class GalaxyView {
       });
     }
     this.nodes.clear();
+    this.labelCache.clear();
     this.fleetNodes.clear();
     this.pickables = [];
     this.world.clear();
@@ -259,6 +290,9 @@ export class GalaxyView {
     }
 
     this.refresh();
+    this.labelCache.clear();
+    this.placeCamera();
+    this.updateLabels();
   }
 
   /** Recolour rings, lanes, fleet markers and labels from current game state. */
@@ -431,6 +465,24 @@ export class GalaxyView {
     }
   }
 
+  /** Current camera distance target (70 = closest, 520 = farthest). */
+  get zoomDistance(): number {
+    return this.distT;
+  }
+
+  get viewAngles(): { theta: number; phi: number } {
+    return { theta: this.thetaT, phi: this.phiT };
+  }
+
+  /** Client-space centre of a system, used by touch diagnostics. */
+  screenPosition(systemId: number): { x: number; y: number } | null {
+    const node = this.nodes.get(systemId);
+    if (!node) return null;
+    const v = node.pos.clone().project(this.camera);
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
+  }
+
   setSelection(systemId: number | null): void {
     this.targetSel = systemId;
     for (const [id, node] of this.nodes) {
@@ -450,35 +502,117 @@ export class GalaxyView {
   }
 
   private handleDown = (ev: PointerEvent): void => {
-    this.dragging = true;
-    this.moved = 0;
-    this.lastX = ev.clientX;
-    this.lastY = ev.clientY;
-    this.downAt = performance.now();
-    this.idleSpin = 0;
+    if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+    this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    try {
+      this.renderer.domElement.setPointerCapture(ev.pointerId);
+    } catch {
+      /* synthetic or already-released pointers */
+    }
+    if (this.pointers.size === 1) {
+      this.dragging = true;
+      this.moved = 0;
+      this.tapCandidate = true;
+      this.lastX = ev.clientX;
+      this.lastY = ev.clientY;
+      this.downX = ev.clientX;
+      this.downY = ev.clientY;
+      this.downPointer = ev.pointerType;
+      this.downAt = performance.now();
+      this.idleSpin = 0;
+      // Resolve the tap against the frame the player actually sees. The camera
+      // may still be easing by the time pointerup arrives, so re-picking later
+      // would test a different view and miss the star under the finger.
+      this.downHit = this.pickAt(ev.clientX, ev.clientY);
+    } else if (this.pointers.size === 2) {
+      this.dragging = false;
+      this.tapCandidate = false;
+      this.downHit = null;
+      this.moved = 999;
+      const points = [...this.pointers.values()];
+      this.pinchStartDist = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+      this.pinchStartZoom = this.distT;
+    }
   };
 
   private handleMove = (ev: PointerEvent): void => {
-    if (this.dragging) {
+    const tracked = this.pointers.get(ev.pointerId);
+    if (tracked) {
+      tracked.x = ev.clientX;
+      tracked.y = ev.clientY;
+    }
+
+    if (this.pointers.size >= 2) {
+      const points = [...this.pointers.values()];
+      const spread = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+      if (this.pinchStartDist > 10 && spread > 10) {
+        this.distT = Math.max(70, Math.min(520, this.pinchStartZoom * (this.pinchStartDist / spread)));
+      }
+      this.tapCandidate = false;
+      this.moved = 999;
+    } else if (this.dragging && tracked) {
       const dx = ev.clientX - this.lastX;
       const dy = ev.clientY - this.lastY;
       this.lastX = ev.clientX;
       this.lastY = ev.clientY;
       this.moved += Math.abs(dx) + Math.abs(dy);
+      if (this.moved > 6) this.tapCandidate = false;
       this.thetaT -= dx * 0.005;
       this.phiT = Math.max(0.16, Math.min(1.34, this.phiT - dy * 0.004));
     }
+
+    // Hover picking stays mouse-only; a touch drag must not steal hover state.
+    if (ev.pointerType !== 'mouse') return;
     const hit = this.pickAt(ev.clientX, ev.clientY);
     this.labels.classList.toggle('hovering', !!hit);
     if (this.onHover) this.onHover(hit);
   };
 
   private handleUp = (ev: PointerEvent): void => {
-    if (!this.dragging) return;
-    this.dragging = false;
-    const quick = performance.now() - this.downAt < 500;
-    if (this.moved < 7 && quick && this.onPick) {
-      this.onPick(this.pickAt(ev.clientX, ev.clientY));
+    if (!this.pointers.delete(ev.pointerId)) return;
+    try {
+      this.renderer.domElement.releasePointerCapture(ev.pointerId);
+    } catch {
+      /* pointer may already be gone */
+    }
+    if (this.pointers.size === 0) {
+      const quick = performance.now() - this.downAt < (this.downPointer === 'touch' ? 450 : 500);
+      const travel = Math.hypot(ev.clientX - this.downX, ev.clientY - this.downY);
+      const tap = this.tapCandidate && this.moved < 8 && travel < 10 && quick;
+      this.dragging = false;
+      this.tapCandidate = false;
+      if (tap) {
+        const hit = this.downHit;
+        this.downHit = null;
+        this.labels.classList.toggle('hovering', !!hit);
+        this.onPick?.(hit);
+      } else {
+        this.downHit = null;
+      }
+    } else if (this.pointers.size === 1) {
+      const [point] = [...this.pointers.values()];
+      this.dragging = true;
+      this.moved = 999;
+      this.tapCandidate = false;
+      this.downHit = null;
+      this.lastX = point.x;
+      this.lastY = point.y;
+    }
+  };
+
+  private handleCancel = (ev: PointerEvent): void => {
+    this.pointers.delete(ev.pointerId);
+    this.downHit = null;
+    if (this.pointers.size === 0) {
+      this.dragging = false;
+      this.tapCandidate = false;
+    } else if (this.pointers.size === 1) {
+      const [point] = [...this.pointers.values()];
+      this.dragging = true;
+      this.moved = 999;
+      this.tapCandidate = false;
+      this.lastX = point.x;
+      this.lastY = point.y;
     }
   };
 
@@ -507,6 +641,21 @@ export class GalaxyView {
     this.composer.setSize(w, h);
     this.camera.aspect = Math.max(0.4, w / Math.max(1, h));
     this.camera.updateProjectionMatrix();
+    this.labelCache.clear();
+    this.labelTimer = 1;
+    this.placeCamera();
+    this.updateLabels();
+  }
+
+  private placeCamera(): void {
+    const sp = Math.sin(this.phi);
+    this.camera.position.set(
+      Math.cos(this.theta) * sp * this.dist,
+      Math.cos(this.phi) * this.dist,
+      Math.sin(this.theta) * sp * this.dist,
+    );
+    this.camera.lookAt(0, 0, 0);
+    this.camera.updateMatrixWorld();
   }
 
   tick(dt: number): void {
@@ -539,7 +688,11 @@ export class GalaxyView {
       node.group.rotation.y += dt * 0.7;
     }
 
-    this.updateLabels();
+    this.labelTimer += dt;
+    if (this.labelTimer >= 0.05) {
+      this.labelTimer = 0;
+      this.updateLabels();
+    }
     this.composer.render();
   }
 
@@ -551,11 +704,20 @@ export class GalaxyView {
       v.set(node.pos.x, node.pos.y + 9.5, node.pos.z);
       v.project(this.camera);
       const visible = v.z < 1 && Math.abs(v.x) < 1.25 && Math.abs(v.y) < 1.25;
-      node.label.style.visibility = visible ? 'visible' : 'hidden';
-      if (!visible) continue;
+      const cached = this.labelCache.get(id);
+      if (!cached || cached.visible !== visible) {
+        node.label.style.visibility = visible ? 'visible' : 'hidden';
+      }
+      if (!visible) {
+        this.labelCache.set(id, { x: 0, y: 0, visible: false });
+        continue;
+      }
       const x = (v.x * 0.5 + 0.5) * w;
       const y = (-v.y * 0.5 + 0.5) * h;
-      node.label.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -50%)`;
+      if (!cached || !cached.visible || Math.abs(cached.x - x) > 0.35 || Math.abs(cached.y - y) > 0.35) {
+        node.label.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -50%)`;
+        this.labelCache.set(id, { x, y, visible: true });
+      }
       if (this.targetSel === id) {
         this.reticle.style.visibility = 'visible';
         this.reticle.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -50%)`;

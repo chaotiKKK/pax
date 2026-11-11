@@ -499,7 +499,7 @@ export const PLANET_TYPES: Record<PlanetTypeId, PlanetTypeDef> = {
 export const PLANET_TYPE_IDS: PlanetTypeId[] = Object.keys(PLANET_TYPES);
 
 // ---------------------------------------------------------------------------
-// Hulls — thirteen classes across six visual families
+// Hulls — thirteen classes, each with its own Blender-authored silhouette
 // ---------------------------------------------------------------------------
 export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
   scout: {
@@ -513,6 +513,7 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     hull: 70,
     speed: 3,
     length: 14,
+    battleLength: 4.2,
     garrison: 0,
     colonizer: false,
     unlock: 'von Beginn an',
@@ -529,6 +530,7 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     hull: 150,
     speed: 2.5,
     length: 24,
+    battleLength: 7,
     garrison: 4,
     colonizer: false,
     unlock: 'von Beginn an',
@@ -538,13 +540,14 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     id: 'raider',
     name: 'Plänkler „Wisp“',
     role: 'Raider',
-    model: 'scout',
+    model: 'raider',
     alloy: 150,
     buildTime: 2,
     attack: 42,
     hull: 110,
     speed: 3.4,
     length: 22,
+    battleLength: 6,
     garrison: 6,
     colonizer: false,
     unlock: 'Vektor 1',
@@ -554,13 +557,14 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     id: 'frigate',
     name: 'Fregatte „Harrow“',
     role: 'Begleitschiff',
-    model: 'corvette',
+    model: 'frigate',
     alloy: 190,
     buildTime: 2,
     attack: 34,
     hull: 260,
     speed: 2.4,
     length: 32,
+    battleLength: 9,
     garrison: 9,
     colonizer: false,
     unlock: 'Aegis 1',
@@ -570,13 +574,14 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     id: 'destroyer',
     name: 'Zerstörer „Kestrel“',
     role: 'Jagdzerstörer',
-    model: 'cruiser',
+    model: 'destroyer',
     alloy: 320,
     buildTime: 3,
     attack: 78,
     hull: 520,
     speed: 2.1,
     length: 46,
+    battleLength: 12,
     garrison: 14,
     colonizer: false,
     unlock: 'Flux 3',
@@ -593,6 +598,7 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     hull: 780,
     speed: 1.8,
     length: 58,
+    battleLength: 15,
     garrison: 22,
     colonizer: false,
     unlock: 'Flux 4',
@@ -602,13 +608,14 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     id: 'carrier',
     name: 'Träger „Aerie“',
     role: 'Trägerkampfgruppe',
-    model: 'cruiser',
+    model: 'carrier',
     alloy: 700,
     buildTime: 5,
     attack: 96,
     hull: 900,
     speed: 1.6,
     length: 64,
+    battleLength: 17,
     garrison: 30,
     colonizer: false,
     unlock: 'Vektor 3 + Flux 3',
@@ -618,13 +625,14 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     id: 'battleship',
     name: 'Linienschiff „Vigil“',
     role: 'Schlachtreihe',
-    model: 'dreadnought',
+    model: 'battleship',
     alloy: 860,
     buildTime: 5,
     attack: 190,
     hull: 1500,
     speed: 1.4,
     length: 74,
+    battleLength: 20,
     garrison: 34,
     colonizer: false,
     unlock: 'Flux 6 + Aegis 4',
@@ -641,6 +649,7 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     hull: 2200,
     speed: 1.2,
     length: 86,
+    battleLength: 25,
     garrison: 44,
     colonizer: false,
     unlock: 'Flux 8 + Aegis 6',
@@ -650,13 +659,14 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     id: 'titan',
     name: 'Titan „Aeterna“',
     role: 'Sternenfestung',
-    model: 'dreadnought',
+    model: 'titan',
     alloy: 1800,
     buildTime: 8,
     attack: 420,
     hull: 3800,
     speed: 1,
     length: 104,
+    battleLength: 31,
     garrison: 60,
     colonizer: false,
     unlock: 'Flux 10 + Aegis 8 + Zivil 6',
@@ -666,13 +676,14 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     id: 'bulwark',
     name: 'Bollwerk „Ward“',
     role: 'Systemwache',
-    model: 'station',
+    model: 'bulwark',
     alloy: 380,
     buildTime: 4,
     attack: 40,
     hull: 1400,
     speed: 1,
     length: 50,
+    battleLength: 16,
     garrison: 18,
     colonizer: false,
     unlock: 'Aegis 3',
@@ -682,13 +693,14 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     id: 'lance',
     name: 'Lanzenträger „Grav“',
     role: 'Belagerung',
-    model: 'cruiser',
+    model: 'lance',
     alloy: 640,
     buildTime: 4,
     attack: 150,
     hull: 600,
     speed: 1.5,
     length: 52,
+    battleLength: 15,
     garrison: 70,
     colonizer: false,
     unlock: 'Flux 5 + Befehl 2',
@@ -705,6 +717,7 @@ export const SHIP_CLASSES: Record<ShipId, ShipDef> = {
     hull: 260,
     speed: 2,
     length: 56,
+    battleLength: 16,
     garrison: 6,
     colonizer: true,
     unlock: 'Zivil 1',
@@ -907,7 +920,11 @@ const TECH_TABLE: Record<Branch, TechRow[]> = {
 };
 
 function techCost(tier: number): number {
-  return Math.round(45 * Math.pow(1.28, tier - 1));
+  // The first slowdown fixed the 90 % technology monoculture, but left the
+  // Aeterna path below 10 % in the matrix. This curve is deliberately between
+  // the old 45-base sprint and the 60-base correction: 48 technologies remain
+  // a real late-game project instead of a runaway or a dead branch.
+  return Math.round(56 * Math.pow(1.25, tier - 1));
 }
 
 export const TECHS: TechDef[] = BRANCH_ORDER.flatMap((branch) =>
@@ -956,7 +973,8 @@ export function shipUnlocked(id: ShipId, tierOf: (b: Branch) => number): boolean
     case 'ark':
       return tierOf('civic') >= 1;
     default:
-      return false;
+      // Player designs from the Ship Designer need no technology.
+      return id.startsWith('custom_');
   }
 }
 
@@ -988,6 +1006,9 @@ export function buildingUnlocked(id: BuildingId, tierOf: (b: Branch) => number):
   }
 }
 
-export const WIN_SYSTEMS = 22;
+export const WIN_SYSTEMS = 8;
 export const WIN_TECHS = 48;
+export const WIN_COLONIES = 5;
+export const WIN_ENERGY = 130;
+export const WIN_TRADE_TIER = 4;
 export const MAX_CYCLES = 240;

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PAX AETERNA — Audio Lab</title>
+    <style>
+      :root { color-scheme: dark; --ink:#f3ecdd; --muted:#98a2ae; --amber:#f0a63f; --line:rgba(240,232,212,.16); --bg:#05070c; }
+      * { box-sizing:border-box; }
+      body { margin:0; padding:28px; background:radial-gradient(ellipse at 50% 0%, #122033, var(--bg) 70%); color:var(--ink); font:13px/1.5 'Segoe UI', system-ui, sans-serif; }
+      main { max-width:1100px; margin:auto; }
+      h1 { margin:0 0 4px; font-size:22px; letter-spacing:.22em; font-weight:500; text-transform:uppercase; }
+      .sub { color:var(--muted); margin:0 0 24px; }
+      h2 { margin:28px 0 10px; color:var(--amber); font-size:12px; letter-spacing:.2em; text-transform:uppercase; }
+      .row { display:grid; grid-template-columns:210px minmax(0,1fr); gap:10px; align-items:center; padding:7px 0; border-top:1px solid var(--line); }
+      .name { font-family:Consolas, monospace; font-size:11px; color:var(--ink); overflow-wrap:anywhere; }
+      audio { width:100%; height:32px; }
+      .sfx { display:flex; flex-wrap:wrap; gap:6px; }
+      .sfx button { border:1px solid var(--line); background:rgba(255,255,255,.03); color:var(--ink); padding:7px 9px; font:10px Consolas, monospace; cursor:pointer; }
+      .sfx button:hover { border-color:var(--amber); color:var(--amber); }
+      .hint { margin-top:26px; color:var(--muted); font-size:11px; }
+      .error { color:#ff9caf; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Pax Aeterna · Audio Lab</h1>
+      <p class="sub">Nicht ausgelieferte Hörprobe. Starte <code>npm run dev</code> und öffne <code>/art/audio-preview.html</code>.</p>
+      <div id="status" class="hint">Lade Manifest…</div>
+      <section id="music"></section>
+      <section id="motifs"></section>
+      <section><h2>Identität</h2><div id="identity-sfx" class="sfx"></div></section>
+      <section id="sfx-section"><h2>SFX</h2><div id="sfx" class="sfx"></div></section>
+      <p class="hint">Musikdateien laufen in der Hörprobe als Schleife. Die Stems eines Fundaments sind einzeln abspielbar; im Spiel mischt der Director sie synchron.</p>
+    </main>
+    <script>
+      const base = new URL('../audio/', location.href);
+      const status = document.getElementById('status');
+      const musicHost = document.getElementById('music');
+      const motifHost = document.getElementById('motifs');
+      const identityHost = document.getElementById('identity-sfx');
+      const sfxHost = document.getElementById('sfx');
+      const identityCues = new Set(['swatch', 'crest', 'apply']);
+      const fmt = (n) => String(n).padStart(2, '0');
+
+      fetch(new URL('manifest.json', base))
+        .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then((data) => {
+          status.textContent = `${Object.keys(data.music).length} Musiktitel · ${Object.keys(data.motifs).length} Motive · ${Object.keys(data.sfx).length} Cue-Gruppen`;
+          musicHost.innerHTML = '<h2>Musik</h2>';
+          for (const [key, track] of Object.entries(data.music)) {
+            const files = track.stems ? Object.entries(track.stems).map(([n, f]) => [key + ' / ' + n, f]) : [[key, track.file]];
+            for (const [label, file] of files) {
+              const row = document.createElement('div');
+              row.className = 'row';
+              row.innerHTML = `<div class="name">${label}<br><span style="color:var(--muted)">${track.bpm} BPM · ${track.bars} bars</span></div>`;
+              const audio = document.createElement('audio');
+              audio.controls = true;
+              audio.loop = !!track.loop;
+              audio.preload = 'none';
+              audio.src = new URL(file, base).href;
+              row.appendChild(audio);
+              musicHost.appendChild(row);
+            }
+          }
+          motifHost.innerHTML = '<h2>Fraktionsmotive</h2>';
+          for (const [key, motif] of Object.entries(data.motifs)) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.innerHTML = `<div class="name">${key} · ${motif.theme}</div>`;
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.preload = 'none';
+            audio.src = new URL(motif.file, base).href;
+            row.appendChild(audio);
+            motifHost.appendChild(row);
+          }
+          for (const [key, cue] of Object.entries(data.sfx)) {
+            const button = document.createElement('button');
+            button.textContent = identityCues.has(key) ? key + ' · Identität' : key;
+            button.addEventListener('click', () => {
+              const file = cue.files[Math.floor(Math.random() * cue.files.length)];
+              const audio = new Audio(new URL(file, base).href);
+              audio.volume = Math.max(0, Math.min(1, Math.pow(10, cue.gainDb / 20)));
+              void audio.play();
+            });
+            (identityCues.has(key) ? identityHost : sfxHost).appendChild(button);
+          }
+        })
+        .catch((error) => {
+          status.className = 'error';
+          status.textContent = 'Manifest konnte nicht geladen werden: ' + error.message;
+        });
+    </script>
+  </body>
+</html>

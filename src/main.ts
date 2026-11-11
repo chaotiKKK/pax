@@ -11,8 +11,15 @@ import { endCycle } from './sim';
 import { LanClient, type NetEvent } from './net';
 import { Hud, type HudActions, type TabId } from './ui/hud';
 import { Lobby, type LobbyPlayerView } from './ui/lobby';
-import { applyIdentityToFaction, loadIdentity } from './ui/identity';
+import { applyIdentityToFaction, loadIdentity, profileOf } from './ui/identity';
+import { MainMenu } from './ui/mainMenu';
+import { PauseMenu } from './ui/pauseMenu';
+import { loadSettings, saveSettings, type Quality } from './ui/settings';
+import { showShipDesigner } from './ui/shipDesigner';
+import { showArmyEditor } from './ui/armyEditor';
+import { registerCustomShips } from './ships/custom';
 import type { Command, FactionId, Game, LobbyPlayer, ShipId } from './types';
+import { deleteSave, deserializeGame, downloadSave, readSave, writeSave } from './save';
 
 const uiRoot = document.getElementById('ui') as HTMLElement;
 const overlays = document.getElementById('overlays') as HTMLElement;
@@ -20,6 +27,9 @@ const galaxyCanvas = document.getElementById('galaxy') as HTMLCanvasElement;
 
 const audio = new AudioEngine();
 let hud: Hud;
+let menu: MainMenu;
+let pauseMenu: PauseMenu;
+let paused = false;
 let lobby: Lobby;
 let galaxy: GalaxyView;
 let scope: SystemScope;
@@ -82,6 +92,13 @@ function sync(opts: { world?: boolean; scope?: boolean } = {}): void {
     busy,
   });
   if (!game) return;
+  const atWar = Object.entries(game.states).some(
+    ([key, state]) => state === 'war' && key.split('|').includes(game!.player),
+  );
+  const enemyHome = game.fleets.some(
+    (fleet) => fleet.owner !== game!.player && game!.systems[fleet.system]?.owner === game!.player,
+  );
+  audio.setMapTension(atWar || enemyHome ? 1 : 0);
   if (opts.world) galaxy.refresh();
   galaxy.setSelection(ui.system);
   if (opts.scope !== false) {
@@ -106,6 +123,7 @@ function bootWorld(g: Game): void {
   galaxy.setGame(g);
   galaxy.resize();
   sync({ world: true, scope: true });
+  audio.enterCampaign(g.player);
   requestAnimationFrame(() => {
     galaxy.resize();
     scope.resize();
@@ -118,13 +136,13 @@ function selectSystem(id: number): void {
   ui.fleet = null;
   ui.tab = 'sector';
   sync({ scope: true });
-  audio.blip(560, 0.05, 'sine', 0.04);
+  audio.play('sys_select');
 }
 
 function selectPlanet(id: number | null): void {
   ui.planet = id;
   sync({ scope: true });
-  audio.blip(680, 0.05, 'sine', 0.04);
+  audio.play('planet_select');
 }
 
 function selectFleet(id: number): void {
@@ -136,14 +154,14 @@ function selectFleet(id: number): void {
   ui.planet = null;
   ui.tab = 'sector';
   sync({ scope: true });
-  audio.blip(420, 0.06, 'triangle', 0.05);
+  audio.play('fleet_select');
 }
 
 function chooseTab(tab: TabId): void {
   ui.tab = tab;
   sync({ scope: false });
   if (tab === 'sector') requestAnimationFrame(() => scope.resize());
-  audio.blip(600, 0.04, 'sine', 0.03);
+  audio.play('ui_tab');
 }
 
 // ---------------------------------------------------------------------------
@@ -161,8 +179,8 @@ function dispatch(cmd: Command): void {
   }
   const res = applyCommand(game, game.player, cmd);
   hud.toast(res.msg, res.ok ? 'good' : 'bad');
-  if (res.ok) audio.confirm();
-  else audio.deny();
+  if (cmd.kind === 'diplo') audio.diploCue(cmd.action, res.ok);
+  else audio.commandCue(cmd.kind, res.ok);
   sync({ world: true, scope: cmd.kind === 'colonize' });
   if (res.ok && mp.mode === 'host') broadcastState();
 }
@@ -175,28 +193,43 @@ async function handleEndCycle(): Promise<void> {
     return;
   }
   busy = true;
-  audio.whoosh();
+  audio.cycleSweep();
   hud.sweep(`Zyklus ${game.cycle} · ${game.systems.filter((s) => s.owner === game!.player).length} Sektoren`);
   sync();
   const g = game;
+  const knownLogs = new Set(g.log);
   const battles = endCycle(g);
+  const freshLogs = g.log.filter((entry) => !knownLogs.has(entry));
   const mine = battles.filter((b) => b.attacker === g.player || b.defender === g.player);
   sync({ world: true, scope: true });
   await sleep(420);
+  audio.cycleStamp();
+  if (freshLogs.some((entry) => entry.kind === 'science')) audio.play('research_complete');
+  if (freshLogs.some((entry) => entry.kind === 'war')) audio.play('diplo_war');
+  if (freshLogs.some((entry) => entry.kind === 'good' && /Schiff|fertiggestellt|besiedelt/.test(entry.text))) {
+    audio.play('build_complete');
+  }
   for (const record of mine) {
-    audio.boom();
+    audio.enterBattle();
     await battle.play(record);
-    sync({ world: true, scope: false });
     const won = record.winner === g.player;
+    audio.battleResult(won);
+    sync({ world: true, scope: false });
     hud.toast(won ? `Sieg im Orbit von ${record.systemName}` : `Rückzug aus ${record.systemName}`, won ? 'good' : 'bad');
   }
+  audio.returnToMap();
+  writeSave(-1, g); // autosave (client path returned above; solo + host reach here)
   busy = false;
   sync({ world: true, scope: true });
   if (mp.mode === 'host') broadcastState();
   if (g.victory) {
+    const won = !g.victory.kind.includes('Ausgelöscht') && !g.victory.kind.includes('Erschöpfung');
+    if (won) audio.victory();
+    else audio.defeat();
     hud.showVictory(g, () => {
       game = null;
       hud.showTitle();
+      audio.enterTitle();
     });
   }
 }
@@ -290,6 +323,7 @@ function handleNet(ev: NetEvent): void {
       mp.players.push({ id: ev.peerId, name: ev.name, faction, ready: false, host: false });
       broadcastRoster();
       if (game) mp.lan?.send({ k: 'state', game }, ev.peerId);
+      audio.play('lan_join');
       refreshLobby(`${ev.name} ist beigetreten.`);
       break;
     }
@@ -302,16 +336,21 @@ function handleNet(ev: NetEvent): void {
     }
     case 'host-left': {
       hud.toast('Der Host hat die Partie beendet.', 'bad');
+      audio.play('disconnect');
       leaveLan();
       break;
     }
     case 'error': {
       lobby.update({ status: ev.msg });
+      audio.play('ui_deny');
       mp.connecting = false;
       break;
     }
     case 'closed': {
-      if (mp.mode !== 'solo') hud.toast('LAN-Verbindung getrennt.', 'bad');
+      if (mp.mode !== 'solo') {
+        hud.toast('LAN-Verbindung getrennt.', 'bad');
+        audio.play('disconnect');
+      }
       break;
     }
     case 'message': {
@@ -354,6 +393,7 @@ function handlePayload(from: string, payload: Record<string, unknown>): void {
 
   if (k === 'chat') {
     mp.chat = [...mp.chat, { name: String(payload.name ?? 'Gast'), text: String(payload.text ?? '') }].slice(-24);
+    audio.play('chat_in');
     if (mp.mode === 'host') lan.send({ k: 'chat', name: String(payload.name ?? 'Gast'), text: String(payload.text ?? '') });
     refreshLobby();
     return;
@@ -363,6 +403,7 @@ function handlePayload(from: string, payload: Record<string, unknown>): void {
     if (mp.mode === 'host') {
       if (payload.ready) mp.ready.add(from);
       else mp.ready.delete(from);
+      audio.play('lan_ready');
       broadcastRoster();
       refreshLobby();
     }
@@ -398,6 +439,9 @@ function handlePayload(from: string, payload: Record<string, unknown>): void {
     sync({ world: true, scope: true });
     if (next.victory) {
       const finished = next;
+      const won = !next.victory.kind.includes('Ausgelöscht') && !next.victory.kind.includes('Erschöpfung');
+      if (won) audio.victory();
+      else audio.defeat();
       hud.showVictory(finished, () => {
         leaveLan();
       });
@@ -412,13 +456,54 @@ function hostStart(seed: number): void {
     refreshLobby('Wähle zuerst eine Macht.');
     return;
   }
-  applyIdentityToFaction(me.faction, loadIdentity());
-  const g = createGame(seed, me.faction);
+  const identity = loadIdentity();
+  applyIdentityToFaction(me.faction, identity);
+  const g = createGame(seed, me.faction, profileOf(identity));
   lobby.hide();
   bootWorld(g);
   mp.lan?.send({ k: 'start', game: g });
   broadcastRoster();
   hud.toast(`LAN-Partie gestartet — ${mp.players.length} Spieler.`, 'good');
+}
+
+function showMenu(): void {
+  paused = false;
+  pauseMenu.hide();
+  hud.enterMenu();
+  menu.showMenu();
+  audio.enterTitle();
+}
+
+function setPaused(value: boolean): void {
+  // Pausing without an active campaign would freeze a dead loop; only real.
+  paused = value && game !== null;
+  if (paused) pauseMenu.show();
+  else pauseMenu.hide();
+}
+
+function applyQuality(quality: Quality): void {
+  saveSettings({ quality });
+  galaxy.setQuality(quality);
+  hud.toast(`Grafikqualität: ${quality}.`, 'info');
+}
+
+function quitApp(): void {
+  audio.play('ui_close');
+  window.close();
+  // Browsers block window.close() for non-script-opened tabs; say so instead of failing silently.
+  setTimeout(() => {
+    if (!document.hidden) window.alert("Sebbo's ChaotiKKK GameStudios: Bitte schließe den Tab, um das Spiel zu beenden.");
+  }, 150);
+}
+
+function backToMenu(): void {
+  if (mp.mode !== 'solo') {
+    leaveLan();
+    return;
+  }
+  game = null;
+  hud.setState({ game: null });
+  showMenu();
 }
 
 function leaveLan(): void {
@@ -432,7 +517,8 @@ function leaveLan(): void {
   mp.chat = [];
   lobby.hide();
   game = null;
-  hud.showTitle();
+  hud.setState({ game: null });
+  showMenu();
 }
 
 async function hostLan(name: string, revealed?: (code: string) => void): Promise<void> {
@@ -522,12 +608,14 @@ const actions: HudActions = {
     ui.targetFleet = fleetId;
     galaxy.setTargetMode(true);
     sync({ scope: false });
+    audio.play('target_lock');
     hud.toast('Kursziel wählen — klicke einen Sektor.', 'info');
   },
   cancelTarget: () => {
     ui.targetFleet = null;
     galaxy.setTargetMode(false);
     sync({ scope: false });
+    audio.play('ui_close');
   },
   colonize: (planetId) => {
     if (!game) return;
@@ -536,7 +624,7 @@ const actions: HudActions = {
     const ark = game.fleets.find((f) => f.owner === game!.player && f.system === planet.systemId && f.ships.ark > 0);
     if (!ark) {
       hud.toast('Keine Arche im System.', 'bad');
-      audio.deny();
+      audio.play('insufficient');
       return;
     }
     dispatch({ kind: 'colonize', fleetId: ark.id, planetId });
@@ -549,24 +637,139 @@ const actions: HudActions = {
     void handleEndCycle();
   },
   setTab: chooseTab,
-  startGame: (faction, seed) => {
-    applyIdentityToFaction(faction, loadIdentity());
-    const g = createGame(seed, faction);
+  startGame: (faction, seed, armyId) => {
+    const identity = loadIdentity();
+    applyIdentityToFaction(faction, identity);
+    const profile = profileOf(identity);
+    if (armyId) profile.armyId = armyId;
+    const g = createGame(seed, faction, profile);
+    menu.hide();
     bootWorld(g);
     hud.toast(`Kampagne ${seed} gestartet — ${SHIP_ORDER.length} Rumpfklassen verfügbar.`, 'good');
-    audio.confirm();
+  },
+  backToMenu: () => {
+    menu.hide();
+    backToMenu();
+  },
+  openPause: () => setPaused(true),
+  openShipDesigner: () => {
+    menu.hide();
+    showShipDesigner(overlays, { onClose: () => showMenu() });
+  },
+  openArmyEditor: () => {
+    menu.hide();
+    showArmyEditor(overlays, { onClose: () => showMenu() });
   },
   toggleAudio: () => {
-    audio.setEnabled(!audio.enabled);
+    if (audio.enabled) {
+      audio.play('ui_toggle_off');
+      audio.setEnabled(false);
+    } else {
+      audio.setEnabled(true);
+      audio.play('ui_toggle_on');
+    }
     hud.setState({ audio: audio.enabled });
-    if (audio.enabled) audio.confirm();
   },
   lanHost: () => lobby.show('host'),
   lanJoin: () => lobby.show('client'),
   identityChanged: () => galaxy.refreshFleetColors(),
+  getAudioSettings: () => ({ music: audio.musicVolume, sfx: audio.sfxVolume }),
+  setAudioVolume: (bus, value) => {
+    if (bus === 'music') audio.setMusicVolume(value);
+    else audio.setSfxVolume(value);
+  },
+  saveGame: (slot) => {
+    if (!game) return;
+    if (mp.mode === 'client') { hud.toast('Als Gast speichert der Host.', 'bad'); return; }
+    const meta = writeSave(slot, game);
+    hud.toast(meta ? `Slot ${slot + 1} gespeichert — Zyklus ${meta.cycle}.` : 'Speichern fehlgeschlagen (Speicher voll?).', meta ? 'good' : 'bad');
+    audio.play(meta ? 'ui_confirm' : 'ui_deny');
+  },
+  loadGame: (slot) => loadFromSlot(slot),
+  deleteSave: (slot) => { deleteSave(slot); hud.toast('Spielstand gelöscht.', 'info'); },
+  exportSave: () => { if (!game) return; downloadSave(game); hud.toast('Spielstand exportiert.', 'good'); },
+  importSave: async (file) => {
+    try {
+      const text = await file.text();
+      const g = deserializeGame(text);
+      if (!g) { hud.toast('Import abgelehnt: keine gültige Pax-Aeterna-Datei.', 'bad'); return; }
+      if (mp.mode !== 'solo') { hud.toast('Import nur im Solo-Modus.', 'bad'); return; }
+      bootWorld(g);
+      hud.toast(`Importiert — Zyklus ${g.cycle}, Seed ${g.seed}.`, 'good');
+    } catch { hud.toast('Import fehlgeschlagen.', 'bad'); }
+  },
+  continueGame: () => loadFromSlot(-1),
+  clearSelection: () => {
+    ui.targetFleet = null;
+    galaxy.setTargetMode(false);
+    ui.system = null;
+    ui.planet = null;
+    ui.fleet = null;
+    sync({ scope: true });
+  },
 };
 
+registerCustomShips();
 hud = new Hud(uiRoot, actions);
+menu = new MainMenu(overlays, {
+  onStartGame: () => {
+    menu.hide();
+    hud.showTitle();
+  },
+  onMultiplayer: (mode) => {
+    menu.hide();
+    lobby.show(mode);
+  },
+  onSaveLoad: () => {
+    menu.hide();
+    hud.showTitle();
+    hud.showSaveLoad();
+  },
+  onShipDesigner: () => {
+    menu.hide();
+    showShipDesigner(overlays, { onClose: () => showMenu() });
+  },
+  onArmyEditor: () => {
+    menu.hide();
+    showArmyEditor(overlays, { onClose: () => showMenu() });
+  },
+  onQuit: quitApp,
+  getAudio: () => ({ enabled: audio.enabled, music: audio.musicVolume, sfx: audio.sfxVolume }),
+  setAudioEnabled: (enabled) => {
+    audio.setEnabled(enabled);
+    hud.setState({ audio: audio.enabled });
+  },
+  setAudioVolume: (bus, value) => {
+    if (bus === 'music') audio.setMusicVolume(value);
+    else audio.setSfxVolume(value);
+  },
+  getQuality: () => loadSettings().quality,
+  setQuality: applyQuality,
+});
+
+pauseMenu = new PauseMenu(overlays, {
+  onResume: () => setPaused(false),
+  onSaveLoad: () => {
+    setPaused(false);
+    hud.showSaveLoad();
+  },
+  onBackToMenu: () => {
+    setPaused(false);
+    backToMenu();
+  },
+  onQuit: () => {
+    setPaused(false);
+    quitApp();
+  },
+  getAudio: () => ({ enabled: audio.enabled, music: audio.musicVolume, sfx: audio.sfxVolume }),
+  setAudioEnabled: (enabled) => {
+    audio.setEnabled(enabled);
+    hud.setState({ audio: audio.enabled });
+  },
+  getQuality: () => loadSettings().quality,
+  setQuality: applyQuality,
+  isMultiplayer: () => mp.mode !== 'solo',
+});
 lobby = new Lobby({
   hostLan: (name) => void hostLan(name),
   joinLan: (code, name, host) => void joinLan(code, name, host),
@@ -577,11 +780,27 @@ lobby = new Lobby({
   leave: leaveLan,
 });
 galaxy = new GalaxyView(galaxyCanvas, hud.stageHost);
+galaxy.setQuality(loadSettings().quality);
 scope = new SystemScope(hud.scopeCanvas);
-battle = new BattleView(overlays);
+battle = new BattleView(overlays, audio);
+audio.enterTitle();
+
+// Studio splash → main menu. hud.enterMenu() is sync after the Hud constructor's
+// showTitle(), so no title frame paints in between.
+hud.enterMenu();
+menu.showSplash(() => menu.showMenu());
 
 galaxy.onPick = (res) => {
-  if (!res || !game) return;
+  if (!game) return;
+  if (!res) {
+    // A tap or click on empty space clears the current selection.
+    if (ui.targetFleet !== null) return;
+    ui.system = null;
+    ui.planet = null;
+    ui.fleet = null;
+    sync({ scope: true });
+    return;
+  }
   if (res.type === 'fleet') {
     selectFleet(res.id);
     return;
@@ -598,11 +817,11 @@ galaxy.onPick = (res) => {
     const res2 = applyCommand(game, game.player, { kind: 'move', fleetId, target: res.id });
     hud.toast(res2.msg, res2.ok ? 'good' : 'bad');
     if (res2.ok) {
-      audio.confirm();
+      audio.commandCue('move', true);
       selectSystem(res.id);
       if (mp.mode === 'host') broadcastState();
     } else {
-      audio.deny();
+      audio.commandCue('move', false);
       sync({ scope: false });
     }
     return;
@@ -676,12 +895,13 @@ function openArsenal(): void {
     statsEl.innerHTML = arsenalStats(id);
     descEl.textContent = SHIP_CLASSES[id].desc;
     void arsenal.setShip(SHIP_CLASSES[id].model, faction.color);
-    audio.blip(700, 0.05, 'sine', 0.04);
+    audio.play('ui_tab');
   });
   requestAnimationFrame(() => arsenal?.resize());
 }
 
 function closeArsenal(): void {
+  audio.play('ui_close');
   arsenal?.dispose();
   arsenal = null;
   arsenalOverlay?.remove();
@@ -689,6 +909,7 @@ function closeArsenal(): void {
 }
 
 hud.openExternal = (name) => {
+  audio.play('ui_open');
   if (name === 'arsenal') openArsenal();
   else hud.showHelp();
 };
@@ -702,9 +923,18 @@ window.addEventListener('keydown', (ev) => {
   if (ev.target instanceof HTMLInputElement) return;
   if (lobby.isOpen) return;
   if (ev.code === 'Space') {
+    if (hud.hasOverlay() || pauseMenu.visible) return;
     ev.preventDefault();
     void handleEndCycle();
   } else if (ev.key === 'Escape') {
+    if (hud.closeTransientOverlay()) return;
+    // A save/load or victory screen is already modal — Esc must not stack
+    // the pause menu on top of it.
+    if (hud.hasOverlay()) return;
+    if (pauseMenu.visible) {
+      setPaused(false);
+      return;
+    }
     if (arsenalOverlay) {
       closeArsenal();
       return;
@@ -713,9 +943,21 @@ window.addEventListener('keydown', (ev) => {
       actions.cancelTarget();
       return;
     }
+    if (game) {
+      setPaused(true);
+      return;
+    }
     ui.planet = null;
     ui.fleet = null;
     sync({ scope: true });
+  } else if (ev.key === 'F5') {
+    ev.preventDefault();
+    actions.saveGame?.(0);
+  } else if (ev.key === 'F9') {
+    ev.preventDefault();
+    loadFromSlot(0);
+  } else if (ev.key === 'i' || ev.key === 'I') {
+    if (hud.getState().game) hud.showIdentityEditor();
   } else if (ev.key >= '1' && ev.key <= '8') {
     const tabs: TabId[] = ['sector', 'empire', 'research', 'diplomacy'];
     const idx = Number(ev.key) - 1;
@@ -723,12 +965,27 @@ window.addEventListener('keydown', (ev) => {
   }
 });
 
+let resizeTimer = 0;
 window.addEventListener('resize', () => {
-  galaxy.resize();
-  scope.resize();
-  battle.resize();
-  arsenal?.resize();
+  // Debounced: GalaxyView/SystemScope/BattleView resize is expensive on drag-resize.
+  clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => {
+    galaxy.resize();
+    scope.resize();
+    battle.resize();
+    arsenal?.resize();
+  }, 80);
 });
+
+function loadFromSlot(slot: number): void {
+  const found = readSave(slot);
+  if (!found) { hud.toast('Kein Spielstand in diesem Slot.', 'bad'); return; }
+  if (mp.mode !== 'solo') leaveLan();
+  setPaused(false);
+  bootWorld(found.game);
+  hud.toast(`Geladen — ${FACTIONS_BY_ID[found.game.player].short}, Zyklus ${found.game.cycle}.`, 'good');
+  audio.play('ui_confirm');
+}
 
 // ---------------------------------------------------------------------------
 // loop
@@ -737,6 +994,15 @@ let last = performance.now();
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  if (document.hidden) {
+    requestAnimationFrame(frame);
+    return;
+  }
+  // Pause menu: freeze render + sim so nothing advances behind the overlay.
+  if (paused) {
+    requestAnimationFrame(frame);
+    return;
+  }
   if (game) galaxy.tick(dt);
   if (game && !battle.active && hud.getState().tab === 'sector') scope.tick(dt);
   battle.tick(dt);
@@ -760,6 +1026,8 @@ if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
     broadcastState,
     handleEndCycle,
     bootWorld,
+    galaxy,
+    audio,
     get mode() {
       return mp.mode;
     },
@@ -771,6 +1039,21 @@ if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
     },
     get battleActive() {
       return battle.active;
+    },
+    loadFromSlot,
+    get paused() {
+      return paused;
+    },
+    writeSave: (slot: number) => (game ? writeSave(slot, game) : null),
+    readSave,
+    get shipClasses() {
+      return SHIP_ORDER.map((id) => ({ id, hull: SHIP_CLASSES[id].hull, model: SHIP_CLASSES[id].model }));
+    },
+    get battleSignatures() {
+      return battle.visualSignatures;
+    },
+    get selection() {
+      return { system: ui.system, planet: ui.planet, fleet: ui.fleet, targetFleet: ui.targetFleet };
     },
   };
 }

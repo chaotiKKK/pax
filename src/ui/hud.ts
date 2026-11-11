@@ -11,8 +11,11 @@ import {
   SHIP_ORDER,
   TECHS_BY_BRANCH,
   TECH_BY_ID,
+  WIN_COLONIES,
+  WIN_ENERGY,
   WIN_SYSTEMS,
   WIN_TECHS,
+  WIN_TRADE_TIER,
   buildingUnlocked,
   shipUnlocked,
 } from '../data';
@@ -41,6 +44,10 @@ import {
   styleGlyph,
   techLabel,
 } from './identity';
+import { GOVERNMENTS, RACE_TRAITS, RELIGIONS, START_HULLS, WORLDVIEWS, optionById } from '../profile';
+import { listSaves, saveMetaLine } from '../save';
+import { listArmyTemplates } from '../ships/armies';
+import { helpContentHtml } from './helpView';
 
 export type TabId = 'sector' | 'empire' | 'research' | 'diplomacy';
 
@@ -68,19 +75,35 @@ export interface HudActions {
   diplo(other: FactionId, action: 'gift' | 'pact' | 'alliance' | 'war' | 'peace'): void;
   endCycle(): void;
   setTab(tab: TabId): void;
-  startGame(faction: FactionId, seed: number): void;
+  startGame(faction: FactionId, seed: number, armyId?: string): void;
+  backToMenu?(): void;
+  openPause?(): void;
+  openShipDesigner?(): void;
+  openArmyEditor?(): void;
   toggleAudio(): void;
   lanHost?(): void;
   lanJoin?(): void;
   identityChanged?(): void;
+  clearSelection?(): void;
+  getAudioSettings?(): { music: number; sfx: number };
+  setAudioVolume?(bus: 'music' | 'sfx', value: number): void;
+  saveGame?(slot: number): void;
+  loadGame?(slot: number): void;
+  deleteSave?(slot: number): void;
+  exportSave?(): void;
+  importSave?(file: File): void;
+  continueGame?(): void;
 }
 
-const SHORT_CLASS: Record<ShipId, string> = Object.fromEntries(
-  SHIP_ORDER.map((c) => [c, SHIP_CLASSES[c].role]),
-) as Record<ShipId, string>;
+// NOTE: no module-level snapshot of SHIP_ORDER — custom ships are registered
+// into SHIP_CLASSES/SHIP_ORDER at boot, after this module is evaluated.
 
 const nf = (n: number, digits = 0) =>
   n.toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>'\"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch] ?? ch));
+}
 
 function legacyCrest(id: FactionId, c: string): string {
   const idx = Math.max(0, FACTION_IDS.indexOf(id));
@@ -105,7 +128,7 @@ function crestSvg(id: FactionId, cls = 'crest'): string {
 
 
 function shipSummary(f: Fleet): string {
-  const parts = SHIP_ORDER.filter((c) => f.ships[c] > 0).map((c) => `${f.ships[c]}× ${SHORT_CLASS[c]}`);
+  const parts = SHIP_ORDER.filter((c) => f.ships[c] > 0).map((c) => `${f.ships[c]}× ${SHIP_CLASSES[c]?.role ?? c}`);
   return parts.length ? parts.join(' · ') : 'leer';
 }
 
@@ -156,6 +179,7 @@ export class Hud {
     this.buildShell();
     this.scopeCanvas = this.scopeEl.querySelector('canvas') as HTMLCanvasElement;
     document.addEventListener('click', this.handleClick);
+    document.addEventListener('input', this.handleInput);
     this.showTitle();
   }
 
@@ -170,10 +194,13 @@ export class Hud {
         </div>
         <div class="topbar-center" id="topbar-center"></div>
         <div class="topbar-right">
-          <button class="icon-btn" data-act="identity" title="Reichsidentität — Name, Farben, Banner, Baustil">◈</button>
-          <button class="icon-btn" data-act="arsenal" title="Arsenal — Schiffsdatenbank">⌖</button>
-          <button class="icon-btn" data-act="audio" title="Ton umschalten" id="audio-btn">♪</button>
-          <button class="icon-btn" data-act="help" title="Handbuch">?</button>
+          <button class="icon-btn" data-act="identity" title="Reichsidentität — Name, Farben, Banner, Baustil (I)" aria-label="Reichsidentität bearbeiten">◈</button>
+          <button class="icon-btn" data-act="arsenal" title="Arsenal — Schiffsdatenbank" aria-label="Arsenal öffnen">⌖</button>
+          <button class="icon-btn" data-act="audio" title="Ton umschalten" aria-label="Ton umschalten" id="audio-btn">♪</button>
+          <button class="icon-btn" data-act="saveload" title="Speichern / Laden (F5 / F9)" aria-label="Speichern oder laden">💾</button>
+          <button class="icon-btn" data-act="help" title="Handbuch" aria-label="Handbuch öffnen">?</button>
+          <button class="icon-btn" data-act="pause" title="Pause-Menü (Esc)" aria-label="Pause-Menü öffnen">⏸</button>
+          <button class="icon-btn" data-act="menu" title="Hauptmenü" aria-label="Zum Hauptmenü">☰</button>
         </div>
       </header>
       <aside class="rail" id="rail"></aside>
@@ -263,6 +290,7 @@ export class Hud {
     const faction = FACTIONS_BY_ID[g.player];
     const systems = g.systems.filter((s) => s.owner === g.player).length;
     const colonies = g.systems.reduce((s, sys) => s + sys.planets.filter((p) => p.owner === g.player).length, 0);
+    const tradeTier = emp.techs.filter((id) => id.startsWith('econ')).length;
     const fleets = g.fleets.filter((f) => f.owner === g.player);
     const power = fleets.reduce((s, f) => s + fleetPower(g, f), 0);
 
@@ -301,14 +329,15 @@ export class Hud {
       <div class="rail-section"><span>Reich</span><span>${faction.short}</span></div>
       <div class="stat-grid">
         <div class="stat"><span>Sektoren</span><b>${systems}/${WIN_SYSTEMS}</b></div>
-        <div class="stat"><span>Kolonien</span><b>${colonies}</b></div>
+        <div class="stat"><span>Kolonien</span><b>${colonies}/${WIN_COLONIES}</b></div>
         <div class="stat"><span>Flotten</span><b>${fleets.length}</b></div>
         <div class="stat"><span>Kampfkraft</span><b>${nf(power)}</b></div>
       </div>
       <div class="rail-section"><span>Auftrag</span><span>Ziel</span></div>
       <div class="objective ${systems >= WIN_SYSTEMS ? 'is-done' : ''}"><i>${systems >= WIN_SYSTEMS ? '✓' : '1'}</i><span>${WIN_SYSTEMS} Sektoren kontrollieren — bisher ${systems}</span></div>
-      <div class="objective ${emp.techs.length >= WIN_TECHS ? 'is-done' : ''}"><i>${emp.techs.length >= WIN_TECHS ? '✓' : '2'}</i><span>${WIN_TECHS} Forschungen abschließen — ${emp.techs.length} erreicht</span></div>
-      <div class="objective ${FACTION_IDS.filter((f) => f !== g.player && !g.empires[f].alive).length >= FACTION_IDS.length - 1 ? 'is-done' : ''}"><i>3</i><span>Alle Rivalen brechen — ${FACTION_IDS.filter((f) => f !== g.player && !g.empires[f].alive).length}/${FACTION_IDS.length - 1}</span></div>
+      <div class="objective ${colonies >= WIN_COLONIES && inc.energy >= WIN_ENERGY && tradeTier >= WIN_TRADE_TIER ? 'is-done' : ''}"><i>${colonies >= WIN_COLONIES && inc.energy >= WIN_ENERGY && tradeTier >= WIN_TRADE_TIER ? '✓' : '2'}</i><span>${WIN_COLONIES} Kolonien, ${WIN_ENERGY} Energie und Wirtschaftsstufe ${WIN_TRADE_TIER} — ${colonies}/${WIN_COLONIES}, ${nf(inc.energy)} Energie, Stufe ${tradeTier}</span></div>
+      <div class="objective ${emp.techs.length >= WIN_TECHS ? 'is-done' : ''}"><i>${emp.techs.length >= WIN_TECHS ? '✓' : '3'}</i><span>${WIN_TECHS} Forschungen abschließen — ${emp.techs.length} erreicht</span></div>
+      <div class="objective ${FACTION_IDS.filter((f) => f !== g.player && !g.empires[f].alive).length >= FACTION_IDS.length - 1 ? 'is-done' : ''}"><i>4</i><span>Alle Rivalen brechen — ${FACTION_IDS.filter((f) => f !== g.player && !g.empires[f].alive).length}/${FACTION_IDS.length - 1}</span></div>
       <div class="rail-foot">${faction.motto}</div>`;
   }
 
@@ -337,7 +366,7 @@ export class Hud {
           )
           .join('')}
       </div>
-      <div class="hint">Leertaste beendet den Zyklus · Mausrad zoomt · Ziehen dreht die Karte</div>
+      <div class="hint">Leertaste: Zyklus · I: Reich · Mausrad: Zoom · Ziehen: Karte</div>
       <button class="end-cycle" data-act="end-cycle" ${this.state.busy ? 'disabled' : ''}>
         Zyklus beenden <kbd>␣</kbd>
       </button>`;
@@ -364,11 +393,14 @@ export class Hud {
     }
     const owner = sys.owner ? FACTIONS_BY_ID[sys.owner] : null;
     this.scopeHead.innerHTML = `
-      <div>
+      <div class="scope-head-main">
         <div class="scope-title" style="color:${owner ? owner.css : 'var(--ink)'}">${sys.name}</div>
         <div class="scope-sub">Sternklasse ${sys.starClass} · ${sys.planets.length} Welten</div>
       </div>
-      <div class="scope-tag">${owner ? owner.short : 'FREI'}</div>`;
+      <div class="scope-head-actions">
+        <div class="scope-tag">${owner ? owner.short : 'FREI'}</div>
+        <button class="icon-btn scope-close" data-act="clear-selection" title="Auswahl schließen" aria-label="Systemauswahl schließen">×</button>
+      </div>`;
   }
 
   private sectorHtml(g: Game): string {
@@ -588,6 +620,11 @@ export class Hud {
   private empireHtml(g: Game): string {
     const mods = empireMods(g, g.player);
     const inc = incomeOf(g, g.player);
+    const profile = g.empires[g.player].profile;
+    const hull = profile ? START_HULLS.find((h) => h.id === profile.shipClass) : null;
+    const traitNames = profile
+      ? profile.traits.map((id) => RACE_TRAITS.find((t) => t.id === id)?.name).filter(Boolean)
+      : [];
     const colonies = g.systems.flatMap((s) => s.planets.filter((p) => p.owner === g.player).map((p) => ({ p, s })));
     const fleets = g.fleets.filter((f) => f.owner === g.player);
 
@@ -596,6 +633,7 @@ export class Hud {
         <div class="eyebrow">Reichsübersicht</div>
         <h2>${FACTIONS_BY_ID[g.player].name}</h2>
         <p class="sub">${FACTIONS_BY_ID[g.player].lore}</p>
+        <p class="ie-motto">${FACTIONS_BY_ID[g.player].motto}</p>
         <div class="btn-row" style="margin-top:8px"><button class="btn btn-sm" data-act="identity">Identität bearbeiten</button></div>
       </div>
       <div class="rule"></div>
@@ -616,6 +654,18 @@ export class Hud {
         <dt>Antrieb</dt><dd>${Math.round(mods.speed * 100)} %</dd>
         <dt>Hauslehre</dt><dd>${techLabel(loadIdentity().tech)}</dd>
       </div>
+      <h3 class="block-title">Reichsprofil <span>${profile ? 'bei der Gründung gewählt' : 'Standard'}</span></h3>
+      ${
+        profile
+          ? `<div class="kv">
+        <dt>Schiffstyp</dt><dd>${hull ? `${hull.name} · ${hull.role}` : profile.shipClass}</dd>
+        <dt>Regierung</dt><dd>${optionById(GOVERNMENTS, profile.government)?.name ?? profile.government}</dd>
+        <dt>Weltanschauung</dt><dd>${optionById(WORLDVIEWS, profile.worldview)?.name ?? profile.worldview}</dd>
+        <dt>Religion</dt><dd>${optionById(RELIGIONS, profile.religion)?.name ?? profile.religion}</dd>
+        <dt>Fähigkeiten</dt><dd>${traitNames.length ? traitNames.join(' · ') : 'keine'}</dd>
+      </div>`
+          : '<p class="sub">Kein Gründungsprofil gespeichert.</p>'
+      }
       <div class="rule"></div>
       <h3 class="block-title">Kolonien <span>${colonies.length}</span></h3>
       <div style="display:flex;flex-direction:column;gap:6px">
@@ -740,6 +790,12 @@ export class Hud {
   }
 
   // ------------------------------------------------------------------ events
+  private handleInput = (ev: Event): void => {
+    const input = ev.target as HTMLInputElement;
+    if (input?.dataset.audio !== 'music' && input?.dataset.audio !== 'sfx') return;
+    this.actions.setAudioVolume?.(input.dataset.audio, Number(input.value) / 100);
+  };
+
   private handleClick = (ev: Event): void => {
     const target = (ev.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
     if (!target) return;
@@ -800,14 +856,48 @@ export class Hud {
       case 'identity':
         this.showIdentityEditor();
         break;
+      case 'clear-selection':
+        this.actions.clearSelection?.();
+        break;
       case 'arsenal':
         this.openExternal?.('arsenal');
         break;
       case 'help':
         this.openExternal?.('help');
         break;
+      case 'pause':
+        this.actions.openPause?.();
+        break;
       case 'close-overlay':
         this.overlayRoot.innerHTML = '';
+        break;
+      case 'saveload':
+        this.showSaveLoad();
+        break;
+      case 'save-slot': {
+        const s = Number(target.dataset.slot ?? 0);
+        this.actions.saveGame?.(s);
+        this.showSaveLoad();
+        break;
+      }
+      case 'load-slot': {
+        const s = Number(target.dataset.slot ?? 0);
+        this.overlayRoot.innerHTML = '';
+        this.actions.loadGame?.(s);
+        break;
+      }
+      case 'del-slot': {
+        const s = Number(target.dataset.slot ?? 0);
+        this.actions.deleteSave?.(s);
+        this.showSaveLoad();
+        break;
+      }
+      case 'export-save':
+        this.actions.exportSave?.();
+        break;
+      case 'continue':
+        this.overlayRoot.innerHTML = '';
+        this.actions.continueGame?.();
         break;
       case 'faction':
         if (target.dataset.faction) {
@@ -836,10 +926,25 @@ export class Hud {
       case 'start': {
         const input = this.overlayRoot.querySelector('#seed-input') as HTMLInputElement | null;
         const seed = input && input.value.trim() ? Number(input.value.trim()) >>> 0 : Math.floor(Math.random() * 1e9);
+        const armyId = (this.overlayRoot.querySelector<HTMLSelectElement>('[data-army]')?.value ?? '') || undefined;
         this.overlayRoot.innerHTML = '';
-        this.actions.startGame(this.titleFaction, seed);
+        this.actions.startGame(this.titleFaction, seed, armyId);
         break;
       }
+      case 'title-back':
+        this.enterMenu();
+        this.actions.backToMenu?.();
+        break;
+      case 'menu':
+        this.enterMenu();
+        this.actions.backToMenu?.();
+        break;
+      case 'open-designer':
+        this.actions.openShipDesigner?.();
+        break;
+      case 'open-army':
+        this.actions.openArmyEditor?.();
+        break;
       default:
         break;
     }
@@ -849,10 +954,15 @@ export class Hud {
   private restartHandler: (() => void) | null = null;
 
   // ------------------------------------------------------------------ screens
+  enterMenu(): void {
+    this.overlayRoot.innerHTML = '';
+    this.shell.style.display = 'none';
+  }
+
   showTitle(): void {
     this.shell.style.display = 'none';
     this.overlayRoot.innerHTML = `
-      <div class="overlay">
+      <div class="overlay overlay-title">
         <div class="title-screen">
           <div class="title-hero">
             <div class="eyebrow">Ein 4X-Remake · Zyklus 2187</div>
@@ -876,6 +986,7 @@ export class Hud {
                 </button>`,
               ).join('')}
             </div>
+            ${(() => { const auto = listSaves()[0]; return auto ? `<div class="title-actions"><button class="btn btn-primary" data-act="continue">▶ Weiterspielen (Autospeicher)</button><span class="save-info">${saveMetaLine(auto, FACTIONS_BY_ID[auto.player]?.name ?? auto.player)}</span></div>` : ''; })()}
             <div class="title-actions">
               <button class="btn btn-primary" data-act="start" style="--fc:${FACTIONS_BY_ID[this.titleFaction].css};padding:14px 22px">Kampagne beginnen</button>
               <label class="seed-field">Seed <input id="seed-input" type="text" inputmode="numeric" placeholder="auto" /></label>
@@ -883,6 +994,17 @@ export class Hud {
             <div class="title-actions" style="margin-top:8px">
               <button class="btn" data-act="lan-host">LAN-Partie hosten</button>
               <button class="btn" data-act="lan-join">LAN beitreten</button>
+            </div>
+            ${(() => {
+              const templates = listArmyTemplates();
+              if (!templates.length) return '';
+              const opts = templates.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+              return `<label class="seed-field" style="margin-top:8px">Startflotte <select data-army><option value="">Standard-Startflotte</option>${opts}</select></label>`;
+            })()}
+            <div class="title-actions" style="margin-top:8px">
+              <button class="btn" data-act="title-back">‹ Hauptmenü</button>
+              <button class="btn" data-act="open-designer">Schiff-Designer</button>
+              <button class="btn" data-act="open-army">Armee-Editor</button>
             </div>
             ${identityEditorHtml(this.titleFaction)}
             <p class="hint" style="margin-top:10px">Ziehen dreht die Karte · Mausrad zoomt · Leertaste beendet den Zyklus</p>
@@ -895,11 +1017,35 @@ export class Hud {
     });
   }
 
+  showSaveLoad(): void {
+    const saves = listSaves();
+    const row = (meta: ReturnType<typeof listSaves>[number], slot: number, label: string) => {
+      if (!meta) {
+        return `<div class="save-row"><span class="save-label">${label}</span><span class="save-empty">leer</span>${slot >= 0 ? `<button class="btn btn-sm" data-act="save-slot" data-slot="${slot}">Speichern</button>` : ''}</div>`;
+      }
+      const who = FACTIONS_BY_ID[meta.player]?.name ?? meta.player;
+      return `<div class="save-row"><span class="save-label">${label}</span><span class="save-info">${saveMetaLine(meta, who)}</span><span class="save-actions"><button class="btn btn-sm btn-primary" data-act="load-slot" data-slot="${slot}">Laden</button>${slot >= 0 ? `<button class="btn btn-sm" data-act="save-slot" data-slot="${slot}">Überschreiben</button><button class="btn btn-sm btn-ghost" data-act="del-slot" data-slot="${slot}">Löschen</button>` : ''}</span></div>`;
+    };
+    this.overlayRoot.innerHTML = `
+      <div class="overlay"><div class="modal">
+        <div class="modal-head"><h2>Speichern / Laden</h2><button class="btn btn-sm btn-ghost" data-act="close-overlay">Schließen</button></div>
+        <p class="hint">Autospeichern erfolgt nach jedem Zyklus (Solo &amp; Host). F5 = Schnell speichern, F9 = Schnell laden (Slot 1).</p>
+        ${row(saves[0], -1, 'Autospeicher')}
+        ${row(saves[1], 0, 'Slot 1')}${row(saves[2], 1, 'Slot 2')}${row(saves[3], 2, 'Slot 3')}
+        <div class="save-row"><span class="save-label">Datei</span><span class="save-actions"><button class="btn btn-sm" data-act="export-save">Exportieren</button><label class="btn btn-sm">Importieren<input type="file" accept=".json,application/json" hidden data-import /></label></span></div>
+      </div></div>`;
+    const input = this.overlayRoot.querySelector('[data-import]') as HTMLInputElement | null;
+    input?.addEventListener('change', () => {
+      const f = input.files?.[0];
+      if (f) this.actions.importSave?.(f);
+    });
+  }
+
   showIdentityEditor(): void {
     const g = this.state.game;
     if (!g) return;
     this.overlayRoot.innerHTML = `
-      <div class="overlay">
+      <div class="overlay" data-overlay="identity">
         <div class="modal identity-modal">
           <div class="modal-head">
             <h2>Reich bearbeiten</h2>
@@ -916,37 +1062,16 @@ export class Hud {
   }
 
   showHelp(): void {
+    const volume = this.actions.getAudioSettings?.() ?? { music: 0.62, sfx: 0.78 };
     this.overlayRoot.innerHTML = `
-      <div class="overlay">
+      <div class="overlay" data-help="true">
         <div class="modal">
-          <div class="modal-head">
-            <h2>Handbuch</h2>
-            <button class="btn btn-sm btn-ghost" data-act="close-overlay">Schließen</button>
-          </div>
-          <div class="help-grid">
-            <div>
-              <h4>Der Zyklus</h4>
-              <p>Jeder Zyklus ist ein Monat. Du gibst Befehle, dann rechnet die Simulation: Einkommen, Wachstum, Bau, Forschung, Bewegung, Gefechte. Danach beginnt der nächste Zyklus.</p>
-              <h4>Kolonien</h4>
-              <p>Baue zuerst eine <b>Orbitalwerft</b>, dann Schiffe. <b>Erzschürfer</b> und <b>Reaktoren</b> tragen den Haushalt, <b>Labore</b> die Forschung, <b>Habitatringe</b> die Bevölkerung.</p>
-              <h4>Archen</h4>
-              <p>Eine <b>Arche „Genesis“</b> landet auf einer habitablen Welt und wird dabei verbraucht. Kolonisieren kostet zusätzlich 30 Einfluss.</p>
-            </div>
-            <div>
-              <h4>Flotten</h4>
-              <p>Wähle eine Flotte im Sektor und drücke <b>Ziel</b>, dann klicke den Zielsektor. Jede Lane kostet mindestens einen Zyklus; langsame Rümpfe brauchen zwei.</p>
-              <h4>Krieg</h4>
-              <p>Gefechte laufen automatisch, sobald verfeindete Flotten im selben System stehen. Wer den Orbit hält, kann eine feindliche Kolonie belagern — die Invasion läuft über mehrere Zyklen.</p>
-              <h4>Tastatur</h4>
-              <ul>
-                <li><b>Leertaste</b> — Zyklus beenden</li>
-                <li><b>Esc</b> — Auswahl aufheben</li>
-                <li><b>1–4</b> — Registerkarten</li>
-              </ul>
-            </div>
-          </div>
+          ${helpContentHtml(volume)}
         </div>
       </div>`;
+    this.overlayRoot
+      .querySelector('[data-help-close]')
+      ?.addEventListener('click', () => { this.overlayRoot.innerHTML = ''; });
   }
 
   showVictory(g: Game, onRestart: () => void): void {
@@ -964,6 +1089,17 @@ export class Hud {
       </div>`;
     this.restartHandler = onRestart;
     this.shell.style.display = 'none';
+  }
+
+  hasOverlay(): boolean {
+    return this.overlayRoot.childElementCount > 0;
+  }
+
+  /** Closes the identity modal or help screen on Escape without touching victory or LAN screens. */
+  closeTransientOverlay(): boolean {
+    if (!this.overlayRoot.querySelector('[data-overlay="identity"]') && !this.overlayRoot.querySelector('[data-help]')) return false;
+    this.overlayRoot.innerHTML = '';
+    return true;
   }
 
   clearOverlay(): void {
