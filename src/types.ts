@@ -247,6 +247,7 @@ export type Command =
   | { kind: 'building'; planetId: number; building: BuildingId }
   | { kind: 'ship'; planetId: number; ship: ShipId }
   | { kind: 'move'; fleetId: number; target: number }
+  | { kind: 'halt'; fleetId: number }
   | { kind: 'colonize'; fleetId: number; planetId: number }
   | { kind: 'research'; branch: Branch; techId: string }
   | { kind: 'diplo'; other: FactionId; action: 'gift' | 'pact' | 'alliance' | 'war' | 'peace' };

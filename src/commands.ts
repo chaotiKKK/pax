@@ -3,6 +3,7 @@ import {
   canBuildShip,
   colonize,
   diplo,
+  orderHalt,
   orderMove,
   planetById,
   queueBuilding,
@@ -43,6 +44,11 @@ export function applyCommand(g: Game, faction: string, cmd: Command): CommandRes
       const fleet = g.fleets.find((f) => f.id === cmd.fleetId);
       if (!fleet || fleet.owner !== faction) return { ok: false, msg: 'Flotte nicht verfügbar.' };
       return orderMove(g, cmd.fleetId, cmd.target);
+    }
+    case 'halt': {
+      const fleet = g.fleets.find((f) => f.id === cmd.fleetId);
+      if (!fleet || fleet.owner !== faction) return { ok: false, msg: 'Flotte nicht verfügbar.' };
+      return orderHalt(g, cmd.fleetId);
     }
     case 'colonize': {
       const fleet = g.fleets.find((f) => f.id === cmd.fleetId);

@@ -49,7 +49,7 @@ import { listSaves, saveMetaLine } from '../save';
 import { listArmyTemplates } from '../ships/armies';
 import { helpContentHtml } from './helpView';
 
-export type TabId = 'sector' | 'empire' | 'research' | 'diplomacy';
+export type TabId = 'sector' | 'fleets' | 'empire' | 'research' | 'diplomacy';
 
 export interface UIState {
   game: Game | null;
@@ -60,6 +60,8 @@ export interface UIState {
   targetFleet: number | null;
   audio: boolean;
   busy: boolean;
+  /** True while the system scope covers the centre stage (central system view). */
+  systemStage: boolean;
 }
 
 export interface HudActions {
@@ -68,6 +70,8 @@ export interface HudActions {
   selectFleet(id: number | null): void;
   beginTarget(fleetId: number): void;
   cancelTarget(): void;
+  haltFleet?(fleetId: number): void;
+  toggleSystemStage?(): void;
   colonize(planetId: number): void;
   build(planetId: number, b: BuildingId): void;
   buildShip(planetId: number, s: ShipId): void;
@@ -171,6 +175,7 @@ export class Hud {
     targetFleet: null,
     audio: true,
     busy: false,
+    systemStage: false,
   };
   private titleFaction: FactionId = 'concord';
   readonly scopeCanvas: HTMLCanvasElement;
@@ -345,6 +350,7 @@ export class Hud {
   private renderTabs(): void {
     const tabs: { id: TabId; label: string }[] = [
       { id: 'sector', label: 'Sektor' },
+      { id: 'fleets', label: 'Flotten' },
       { id: 'empire', label: 'Reich' },
       { id: 'research', label: 'Forschung' },
       { id: 'diplomacy', label: 'Diplomatie' },
@@ -366,7 +372,7 @@ export class Hud {
           )
           .join('')}
       </div>
-      <div class="hint">Leertaste: Zyklus · I: Reich · Mausrad: Zoom · Ziehen: Karte</div>
+      <div class="hint">Leertaste: Zyklus · 1–5: Registerkarten · Mausrad: Zoom · Ziehen: Karte</div>
       <button class="end-cycle" data-act="end-cycle" ${this.state.busy ? 'disabled' : ''}>
         Zyklus beenden <kbd>␣</kbd>
       </button>`;
@@ -375,14 +381,21 @@ export class Hud {
   // ------------------------------------------------------------------- panel
   private renderPanel(g: Game): void {
     if (this.state.tab === 'sector') this.renderScope(g);
+    // Central system view: the system scope grows onto the centre stage.
+    this.shell.classList.toggle(
+      'system-stage',
+      this.state.systemStage && this.state.tab === 'sector' && this.state.system !== null,
+    );
     this.bodyEl.innerHTML =
       this.state.tab === 'sector'
         ? this.sectorHtml(g)
-        : this.state.tab === 'empire'
-          ? this.empireHtml(g)
-          : this.state.tab === 'research'
-            ? this.researchHtml(g)
-            : this.diplomacyHtml(g);
+        : this.state.tab === 'fleets'
+          ? this.fleetsHtml(g)
+          : this.state.tab === 'empire'
+            ? this.empireHtml(g)
+            : this.state.tab === 'research'
+              ? this.researchHtml(g)
+              : this.diplomacyHtml(g);
   }
 
   private renderScope(g: Game): void {
@@ -399,6 +412,7 @@ export class Hud {
       </div>
       <div class="scope-head-actions">
         <div class="scope-tag">${owner ? owner.short : 'FREI'}</div>
+        <button class="btn btn-sm" data-act="stage-toggle" title="${this.state.systemStage ? 'Zurück zur Galaxie (Esc)' : 'Zentrale Ansicht — das System füllt die Bühne'}">${this.state.systemStage ? '← Galaxie' : '⛶ Zentral'}</button>
         <button class="icon-btn scope-close" data-act="clear-selection" title="Auswahl schließen" aria-label="Systemauswahl schließen">×</button>
       </div>`;
   }
@@ -608,12 +622,70 @@ export class Hud {
       ${
         isMine
           ? `<div class="btn-row">
-              <button class="btn btn-sm" data-act="fleet" data-id="${f.id}">Details</button>
+              <button class="btn btn-sm" data-act="fleet" data-id="${f.id}">Steuerung</button>
               <button class="btn btn-sm btn-ghost" data-act="target" data-id="${f.id}">Ziel</button>
             </div>`
           : `<span class="chip own-${faction.id}"><i></i>${faction.short}</span>`
       }
     </div>`;
+  }
+
+  // ------------------------------------------------------------------ fleets
+  private fleetsHtml(g: Game): string {
+    const mine = g.fleets.filter((f) => f.owner === g.player);
+    const selected = mine.find((f) => f.id === this.state.fleet) ?? null;
+    const list = mine.length
+      ? mine.map((f) => this.fleetRow(g, f)).join('')
+      : '<p class="sub">Keine eigene Flotte. Baue Schiffe an einer Werft.</p>';
+    if (!selected) {
+      return `<div class="panel-head">
+        <div class="eyebrow">Flottensteuerung</div>
+        <h2>${mine.length} eigene Flotten</h2>
+        <p class="sub">Wähle eine Flotte für Schiffe, Status und Befehle. „Ziel“ setzt den Kurs: danach einen Sektor in der Galaxie anklicken.</p>
+      </div>
+      <div class="rule"></div>
+      ${list}`;
+    }
+    const f = selected;
+    const here = g.systems[f.system];
+    const route = f.path.length
+      ? f.path.slice(f.step).map((id) => g.systems[id].name).join(' → ')
+      : '—';
+    const shipRows = SHIP_ORDER.filter((c) => f.ships[c] > 0)
+      .map((c) => {
+        const max = SHIP_CLASSES[c].hull * empireMods(g, f.owner).hull;
+        const cur = max > 0 ? Math.round((f.hp[c] / max) * 100) : 0;
+        return `<div class="ship-row">
+          <div>
+            <div class="ship-name">${f.ships[c]}× ${SHIP_CLASSES[c].name}</div>
+            <div class="ship-sub">${SHIP_CLASSES[c].role} · Hülle ${cur} %</div>
+          </div>
+        </div>`;
+      })
+      .join('');
+    return `<div class="panel-head">
+      <div class="eyebrow">Flotte · ${FACTIONS_BY_ID[f.owner].short}</div>
+      <h2>${f.name}</h2>
+      <p class="sub">Aktuell: ${here.name} · Route: ${route}</p>
+    </div>
+    <div class="rule"></div>
+    <div class="kv">
+      <dt>Kampfkraft</dt><dd>${nf(fleetPower(g, f))}</dd>
+      <dt>Hülle</dt><dd>${nf(hullOf(f))} HP</dd>
+      <dt>Reparatur</dt><dd>${Math.round(integrity(g, f) * 100)} %</dd>
+      <dt>Archen</dt><dd>${f.ships.ark}</dd>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-sm" data-act="target" data-id="${f.id}">Kurs setzen</button>
+      <button class="btn btn-sm btn-ghost" data-act="halt-fleet" data-id="${f.id}" ${f.path.length ? '' : 'disabled'}>Halten</button>
+      <button class="btn btn-sm btn-ghost" data-act="fleet-system" data-id="${f.system}">System anzeigen</button>
+    </div>
+    <div class="rule"></div>
+    <h3 class="block-title">Schiffe <span>${f.ships.ark} Arche(n)</span></h3>
+    <div style="display:flex;flex-direction:column;gap:6px">${shipRows || '<p class="sub">Keine Schiffe.</p>'}</div>
+    <div class="rule"></div>
+    <h3 class="block-title">Alle Flotten <span>${mine.length}</span></h3>
+    ${list}`;
   }
 
   // ------------------------------------------------------------------ empire
@@ -826,6 +898,18 @@ export class Hud {
         break;
       case 'cancel-target':
         this.actions.cancelTarget();
+        break;
+      case 'halt-fleet':
+        if (id !== null) this.actions.haltFleet?.(id);
+        break;
+      case 'stage-toggle':
+        this.actions.toggleSystemStage?.();
+        break;
+      case 'fleet-system':
+        if (id !== null) {
+          this.actions.selectSystem(id);
+          this.actions.setTab('sector');
+        }
         break;
       case 'colonize':
         if (id !== null) this.actions.colonize(id);

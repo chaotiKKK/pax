@@ -132,6 +132,16 @@ export class SystemScope {
   private selected: number | null = null;
   private hovered: number | null = null;
   private disposables: THREE.Material[] = [];
+  // Camera focus: eases between the whole-system overview and a close-up of
+  // the selected planet. `distGoal` is what the wheel writes; `dist` follows.
+  private camTarget = new THREE.Vector3();
+  private camGoal = new THREE.Vector3();
+  private dist = 112;
+  private distGoal = 112;
+  private downX = 0;
+  private downY = 0;
+  private moved = 0;
+  private dragging = false;
 
   onPick: ((planetId: number | null) => void) | null = null;
 
@@ -165,13 +175,27 @@ export class SystemScope {
     canvas.addEventListener('pointermove', this.handleMove);
     canvas.addEventListener('pointerleave', () => {
       this.hovered = null;
+      this.dragging = false;
       canvas.style.cursor = 'default';
     });
+    canvas.addEventListener('pointerdown', (ev) => {
+      this.dragging = true;
+      this.moved = 0;
+      this.downX = ev.clientX;
+      this.downY = ev.clientY;
+    });
+    canvas.addEventListener('pointerup', () => {
+      this.dragging = false;
+    });
+    canvas.addEventListener('wheel', this.handleWheel, { passive: false });
     canvas.addEventListener('click', this.handleClick);
     this.resize();
   }
 
   setSystem(sys: StarSystem | null, explored: boolean): void {
+    // Every system starts from the neutral overview.
+    this.camTarget.set(0, 0, 0);
+    this.dist = this.distGoal = 112;
     for (const node of this.planets) {
       this.root.remove(node.pivot);
       node.mesh.geometry.dispose();
@@ -321,7 +345,14 @@ export class SystemScope {
     this.selected = planetId;
     const node = this.planets.find((n) => n.planet.id === planetId);
     this.selectRing.visible = !!node;
-    if (node) this.selectRing.scale.setScalar(node.radius * 2.0);
+    if (node) {
+      this.selectRing.scale.setScalar(node.radius * 2.0);
+      // Nahansicht: close enough that the planet fills the frame.
+      this.distGoal = THREE.MathUtils.clamp(node.radius * 4.5, 9, 18);
+    } else {
+      // No planet selected = whole-system overview again.
+      this.distGoal = 112;
+    }
   }
 
   private updatePointer(ev: PointerEvent | MouseEvent): void {
@@ -330,14 +361,30 @@ export class SystemScope {
     this.pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
+  private lastClientX = 0;
+  private lastClientY = 0;
+
   private handleMove = (ev: PointerEvent): void => {
+    if (this.dragging) {
+      this.moved += Math.abs(ev.clientX - this.lastClientX) + Math.abs(ev.clientY - this.lastClientY);
+      this.theta += (ev.clientX - this.lastClientX) * 0.006;
+    }
+    this.lastClientX = ev.clientX;
+    this.lastClientY = ev.clientY;
     this.updatePointer(ev);
     const hit = this.pick();
     this.hovered = hit;
     this.canvas.style.cursor = hit !== null ? 'pointer' : 'default';
   };
 
+  private handleWheel = (ev: WheelEvent): void => {
+    ev.preventDefault();
+    this.distGoal = THREE.MathUtils.clamp(this.distGoal * (1 + ev.deltaY * 0.0012), 7, 170);
+  };
+
   private handleClick = (ev: MouseEvent): void => {
+    // A "click" that was really a drag (rotating) must not change selection.
+    if (Math.hypot(ev.clientX - this.downX, ev.clientY - this.downY) > 6) return;
     this.updatePointer(ev);
     if (this.onPick) this.onPick(this.pick());
   };
@@ -363,12 +410,23 @@ export class SystemScope {
 
   tick(dt: number): void {
     this.time += dt;
-    this.theta += dt * 0.055;
-    const r = 112;
-    this.camera.position.set(Math.cos(this.theta) * r * 0.55, 58, Math.sin(this.theta) * r * 0.85);
-    this.camera.lookAt(0, 0, 0);
+    if (!this.dragging) this.theta += dt * 0.055;
 
-    const v = new THREE.Vector3();
+    // Ease the focus onto the selected planet (it orbits, so track it live).
+    const selectedNode = this.selected !== null ? this.planets.find((n) => n.planet.id === this.selected) : undefined;
+    if (selectedNode) selectedNode.mesh.getWorldPosition(this.camGoal);
+    else this.camGoal.set(0, 0, 0);
+    const damp = 1 - Math.exp(-dt * 4);
+    this.camTarget.lerp(this.camGoal, damp);
+    this.dist += (this.distGoal - this.dist) * (1 - Math.exp(-dt * 3.5));
+    this.camera.position.set(
+      this.camTarget.x + Math.cos(this.theta) * this.dist * 0.55,
+      this.camTarget.y + this.dist * 0.52,
+      this.camTarget.z + Math.sin(this.theta) * this.dist * 0.85,
+    );
+    this.camera.lookAt(this.camTarget);
+
+    const pv = new THREE.Vector3();
     for (const node of this.planets) {
       node.pivot.rotation.y += node.speed * dt;
       node.mesh.rotation.y += dt * 0.06;
@@ -376,7 +434,7 @@ export class SystemScope {
       const mat = node.mesh.material as THREE.ShaderMaterial;
       mat.uniforms.uTime.value = this.time;
       (node.cloud.material as THREE.ShaderMaterial).uniforms.uTime.value = this.time;
-      node.mesh.getWorldPosition(v);
+      node.mesh.getWorldPosition(pv);
       if (this.hovered === node.planet.id) node.mesh.scale.setScalar(1.035);
       else node.mesh.scale.setScalar(1);
     }
@@ -384,8 +442,8 @@ export class SystemScope {
     if (this.selected !== null) {
       const node = this.planets.find((n) => n.planet.id === this.selected);
       if (node) {
-        node.mesh.getWorldPosition(v);
-        this.selectRing.position.copy(v);
+        node.mesh.getWorldPosition(pv);
+        this.selectRing.position.copy(pv);
         this.selectRing.quaternion.copy(this.camera.quaternion);
       }
     }

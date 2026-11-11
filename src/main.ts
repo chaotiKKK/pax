@@ -46,6 +46,8 @@ const ui = {
   planet: null as number | null,
   fleet: null as number | null,
   targetFleet: null as number | null,
+  /** Central system view: the system scope covers the centre stage. */
+  systemStage: false,
 };
 
 type Mode = 'solo' | 'host' | 'client';
@@ -90,6 +92,7 @@ function sync(opts: { world?: boolean; scope?: boolean } = {}): void {
     targetFleet: ui.targetFleet,
     audio: audio.enabled,
     busy,
+    systemStage: ui.systemStage,
   });
   if (!game) return;
   const atWar = Object.entries(game.states).some(
@@ -115,9 +118,11 @@ function bootWorld(g: Game): void {
   const capital = g.empires[g.player].capital;
   const planet = g.systems.flatMap((s) => s.planets).find((p) => p.id === capital);
   ui.system = planet ? planet.systemId : null;
-  ui.planet = capital;
   ui.fleet = null;
   ui.targetFleet = null;
+  ui.systemStage = false;
+  // Start on the system overview; the close-up is for planet clicks.
+  ui.planet = null;
   ui.tab = 'sector';
   busy = false;
   galaxy.setGame(g);
@@ -152,16 +157,25 @@ function selectFleet(id: number): void {
   ui.fleet = id;
   ui.system = fleet.system;
   ui.planet = null;
-  ui.tab = 'sector';
+  // Fleet selection always lands on the fleet screen (Flottensteuerung).
+  ui.tab = 'fleets';
   sync({ scope: true });
   audio.play('fleet_select');
 }
 
 function chooseTab(tab: TabId): void {
   ui.tab = tab;
+  if (tab !== 'sector') ui.systemStage = false;
   sync({ scope: false });
   if (tab === 'sector') requestAnimationFrame(() => scope.resize());
   audio.play('ui_tab');
+}
+
+function toggleSystemStage(): void {
+  if (ui.system === null) return;
+  ui.systemStage = !ui.systemStage;
+  sync({ scope: true });
+  audio.play(ui.systemStage ? 'ui_open' : 'ui_close');
 }
 
 // ---------------------------------------------------------------------------
@@ -617,6 +631,8 @@ const actions: HudActions = {
     sync({ scope: false });
     audio.play('ui_close');
   },
+  haltFleet: (fleetId) => dispatch({ kind: 'halt', fleetId }),
+  toggleSystemStage,
   colonize: (planetId) => {
     if (!game) return;
     const planet = game.systems.flatMap((s) => s.planets).find((p) => p.id === planetId);
@@ -705,6 +721,7 @@ const actions: HudActions = {
     ui.system = null;
     ui.planet = null;
     ui.fleet = null;
+    ui.systemStage = false;
     sync({ scope: true });
   },
 };
@@ -830,7 +847,18 @@ galaxy.onPick = (res) => {
 };
 
 scope.onPick = (planetId) => {
+  // Canvas click: planet = Nahansicht zoom, empty space = back to overview.
   if (planetId !== null) selectPlanet(planetId);
+  else if (ui.planet !== null) selectPlanet(null);
+};
+
+galaxy.onDoublePick = (res) => {
+  if (res.type === 'fleet') {
+    selectFleet(res.id);
+    return;
+  }
+  selectSystem(res.id);
+  if (ui.system !== null && !ui.systemStage) toggleSystemStage();
 };
 
 // ---------------------------------------------------------------------------
@@ -943,6 +971,15 @@ window.addEventListener('keydown', (ev) => {
       actions.cancelTarget();
       return;
     }
+    // Esc cascade: close-up → central stage → pause menu.
+    if (ui.planet !== null) {
+      selectPlanet(null);
+      return;
+    }
+    if (ui.systemStage) {
+      toggleSystemStage();
+      return;
+    }
     if (game) {
       setPaused(true);
       return;
@@ -959,7 +996,7 @@ window.addEventListener('keydown', (ev) => {
   } else if (ev.key === 'i' || ev.key === 'I') {
     if (hud.getState().game) hud.showIdentityEditor();
   } else if (ev.key >= '1' && ev.key <= '8') {
-    const tabs: TabId[] = ['sector', 'empire', 'research', 'diplomacy'];
+    const tabs: TabId[] = ['sector', 'fleets', 'empire', 'research', 'diplomacy'];
     const idx = Number(ev.key) - 1;
     if (idx < tabs.length) chooseTab(tabs[idx]);
   }
@@ -1003,7 +1040,7 @@ function frame(now: number): void {
     requestAnimationFrame(frame);
     return;
   }
-  if (game) galaxy.tick(dt);
+  if (game && !ui.systemStage) galaxy.tick(dt);
   if (game && !battle.active && hud.getState().tab === 'sector') scope.tick(dt);
   battle.tick(dt);
   arsenal?.tick(dt);

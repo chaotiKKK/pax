@@ -250,6 +250,19 @@ export function orderMove(g: Game, fleetId: number, target: number): { ok: boole
   return { ok: true, msg: `${f.name} setzt Kurs auf ${g.systems[target].name}.` };
 }
 
+/** Stops a fleet wherever it currently is. Safe mid-transit: the fleet simply
+ * stays in the system it is currently in and keeps its explored flags. */
+export function orderHalt(g: Game, fleetId: number): { ok: boolean; msg: string } {
+  const f = g.fleets.find((x) => x.id === fleetId);
+  if (!f) return { ok: false, msg: 'Flotte nicht gefunden.' };
+  if (f.path.length === 0) return { ok: false, msg: `${f.name} steht bereits still.` };
+  f.path = [];
+  f.step = 0;
+  f.wait = 0;
+  g.systems[f.system].explored[f.owner] = true;
+  return { ok: true, msg: `${f.name} hält in ${g.systems[f.system].name} an.` };
+}
+
 export function mergeShip(g: Game, owner: FactionId, system: number, cls: ShipId): void {
   const list = fleetAt(g, system, owner);
   const f = list.find((x) => x.path.length === 0) ?? list[0] ?? newFleet(g, owner, system);

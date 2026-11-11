@@ -8,19 +8,195 @@ const CLASS_ORDER: ShipId[] = SHIP_ORDER;
 interface ShipVisualProfile {
   model: string;
   length: number;
+  accessory: string;
   signature: string;
+}
+
+/**
+ * Per-class signature glow — the hue that marks each of the thirteen hulls in
+ * the cinematic (engine pods, spires, rings). Tinted toward the faction colour
+ * at build time so line-ups stay readable, but the hue gap between classes
+ * survives so a glance sorts the line-up without reading labels.
+ */
+const CLASS_ACCENT: Record<string, number> = {
+  scout: 0x9fe8ff,
+  corvette: 0x7dffb0,
+  raider: 0xffb03a,
+  frigate: 0x6fd3ff,
+  destroyer: 0xff7a5c,
+  cruiser: 0xffd27a,
+  carrier: 0xc49aff,
+  battleship: 0xff9de2,
+  dreadnought: 0xff5c5c,
+  titan: 0xffe45c,
+  bulwark: 0x8affd8,
+  lance: 0xa8ff5c,
+  ark: 0x5ce8ff,
+};
+
+/** Which procedural signature accessory a class gets (falls back to the hull). */
+function accessoryFor(id: ShipId, model: string): string {
+  if (id in CLASS_ACCENT) return id;
+  if (model in CLASS_ACCENT) return model;
+  return 'cruiser';
+}
+
+/** Short label shown above each hull in the cinematic. */
+function classLabel(id: ShipId): string {
+  const name = SHIP_CLASSES[id]?.name ?? id;
+  return name.split(' „')[0];
 }
 
 // Profiles are built dynamically from the live SHIP_CLASSES / SHIP_ORDER
 // tables on every call — never snapshotted at import time — so ship classes
 // registered later (player Custom designs via registerCustomShips()) are
-// rendered in the cinematic too. The signature embeds the class id so that
-// custom designs sharing a base GLB hull still get a unique visual identity.
+// rendered in the cinematic too. The signature embeds the class id and the
+// accessory key so that custom designs sharing a base GLB hull still get a
+// unique visual identity in the cinematic and in `visualSignatures`.
 function visualProfileFor(id: ShipId): ShipVisualProfile {
   const def = SHIP_CLASSES[id];
   const length = def?.battleLength ?? 8;
   const model = def?.model ?? 'cruiser';
-  return { model, length, signature: [id, model, length].join('|') };
+  const accessory = accessoryFor(id, model);
+  return { model, length, accessory, signature: [id, model, length, accessory].join('|') };
+}
+
+/**
+ * Role-true procedural marker per class, built from THREE primitives only
+ * (no new assets or dependencies). Every piece sits on the hull's centreline
+ * (length = Z, beam = X, height = Y) so it reads from the battle camera
+ * regardless of which way the underlying GLB faces.
+ */
+function buildClassAccessory(key: string, size: THREE.Vector3, accent: THREE.Color, faction: THREE.Color): THREE.Group {
+  const glow = new THREE.MeshStandardMaterial({
+    color: accent,
+    emissive: accent,
+    emissiveIntensity: 2.4,
+    roughness: 0.35,
+    metalness: 0.1,
+  });
+  const hull = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0x3a4350).lerp(faction, 0.35),
+    roughness: 0.5,
+    metalness: 0.55,
+  });
+  const group = new THREE.Group();
+  group.userData.classAccessory = true;
+  const add = (mesh: THREE.Mesh, x: number, y: number, z: number): void => {
+    mesh.position.set(x, y, z);
+    group.add(mesh);
+  };
+  const w = Math.max(1.2, size.x);
+  const h = Math.max(0.8, size.y);
+  const l = Math.max(2, size.z);
+  const top = h * 0.5;
+  switch (key) {
+    case 'scout': {
+      // Sensor mast with a lit tip — the smallest hull gets the tallest eye.
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * h, 0.05 * h, h * 1.1, 6), hull);
+      add(mast, 0, top + h * 0.55, 0);
+      add(new THREE.Mesh(new THREE.SphereGeometry(h * 0.22, 10, 8), glow), 0, top + h * 1.15, 0);
+      break;
+    }
+    case 'corvette': {
+      // Twin engine pods at the stern.
+      for (const s of [-1, 1]) {
+        add(new THREE.Mesh(new THREE.SphereGeometry(h * 0.3, 10, 8), glow), s * w * 0.3, 0, -l * 0.42);
+      }
+      break;
+    }
+    case 'raider': {
+      // Prow spike: a cone jutting past the bow.
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(h * 0.28, l * 0.4, 8), glow);
+      spike.rotation.x = -Math.PI / 2;
+      add(spike, 0, top * 0.4, l * 0.62);
+      break;
+    }
+    case 'frigate': {
+      // Shield arc: a half-ring standing across the midship.
+      const arc = new THREE.Mesh(new THREE.TorusGeometry(w * 0.55, h * 0.09, 8, 24, Math.PI), glow);
+      arc.rotation.y = Math.PI / 2;
+      add(arc, 0, 0, 0);
+      break;
+    }
+    case 'destroyer': {
+      // Lance: a long barrel along the spine.
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(h * 0.13, h * 0.13, l * 0.85, 8), hull);
+      barrel.rotation.x = Math.PI / 2;
+      add(barrel, 0, top + h * 0.12, 0);
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(h * 0.16, l * 0.18, 8), glow);
+      tip.rotation.x = Math.PI / 2;
+      add(tip, 0, top + h * 0.12, l * 0.51);
+      break;
+    }
+    case 'cruiser': {
+      // Three turret blocks on the spine.
+      for (const z of [-0.26, 0, 0.26]) {
+        add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.22, h * 0.38, l * 0.12), hull), 0, top + h * 0.16, z * l);
+      }
+      break;
+    }
+    case 'carrier': {
+      // Flight deck slab plus wingtip pods.
+      add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.85, h * 0.2, l * 0.8), hull), 0, top + h * 0.12, 0);
+      for (const s of [-1, 1]) {
+        add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.16, h * 0.2, l * 0.3), glow), s * w * 0.52, top * 0.5, -l * 0.2);
+      }
+      break;
+    }
+    case 'battleship': {
+      // Spinal gun: a heavy barrel with a muzzle bell.
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(h * 0.2, h * 0.24, l * 0.7, 10), hull);
+      barrel.rotation.x = Math.PI / 2;
+      add(barrel, 0, top + h * 0.2, l * 0.05);
+      const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(h * 0.3, h * 0.2, l * 0.12, 10), glow);
+      muzzle.rotation.x = Math.PI / 2;
+      add(muzzle, 0, top + h * 0.2, l * 0.44);
+      break;
+    }
+    case 'dreadnought': {
+      // Cathedral spire with a halo ring.
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(w * 0.16, h * 1.3, 6), hull);
+      add(spire, 0, top + h * 0.65, -l * 0.1);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(w * 0.24, h * 0.06, 8, 24), glow);
+      halo.rotation.x = Math.PI / 2;
+      add(halo, 0, top + h * 0.9, -l * 0.1);
+      break;
+    }
+    case 'titan': {
+      // The halo: one great ring standing around the hull.
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(w * 0.52, h * 0.08, 10, 40), glow);
+      add(ring, 0, h * 0.1, 0);
+      break;
+    }
+    case 'bulwark': {
+      // Shield dome: a flattened cap over the hull.
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(w * 0.48, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), hull);
+      dome.scale.y = 0.55;
+      add(dome, 0, top * 0.7, 0);
+      break;
+    }
+    case 'lance': {
+      // Drop-pod row down the starboard flank.
+      for (let i = 0; i < 4; i++) {
+        add(new THREE.Mesh(new THREE.SphereGeometry(h * 0.2, 8, 6), glow), w * 0.42, top * 0.3, (-0.3 + i * 0.2) * l);
+      }
+      break;
+    }
+    case 'ark': {
+      // Three habitat rings around the hull.
+      for (const z of [-0.28, 0, 0.28]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(w * 0.44, h * 0.11, 8, 26), glow);
+        add(ring, 0, 0, z * l);
+      }
+      break;
+    }
+    default: {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(w * 0.5, h * 0.1, 8, 26), glow);
+      add(ring, 0, 0, 0);
+    }
+  }
+  return group;
 }
 
 export interface BattleAudio {
@@ -201,7 +377,21 @@ export class BattleView {
     delete this.root.dataset.shipGroups;
     delete this.root.dataset.shipSignatures;
 
-    for (const ship of this.ships) this.scene.remove(ship.group);
+    for (const ship of this.ships) {
+      this.scene.remove(ship.group);
+      // Only the procedural class-signature pieces are ours to free; the GLB
+      // clones share cached source assets and are left as they were.
+      ship.group.traverse((obj) => {
+        if (!obj.userData.classAccessory) return;
+        obj.traverse((inner) => {
+          const mesh = inner as THREE.Mesh;
+          if (mesh.isMesh) mesh.geometry?.dispose();
+          const sprite = inner as THREE.Sprite;
+          const material = sprite.material as THREE.Material | undefined;
+          if (material) material.dispose();
+        });
+      });
+    }
     this.ships = [];
     for (const t of this.tracers) this.scene.remove(t.line);
     this.tracers = [];
@@ -235,6 +425,42 @@ export class BattleView {
       this.resolveFn = resolve;
       void this.buildFleets(battle, a.css, b.css);
     });
+  }
+
+  /** Cached name-plate textures, one per class (shared across battles). */
+  private static labelTextures = new Map<string, THREE.CanvasTexture>();
+
+  private classLabelSprite(id: ShipId, factionCss: string): THREE.Sprite {
+    const label = classLabel(id);
+    let texture = BattleView.labelTextures.get(label);
+    if (!texture) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 96;
+      const ctx = canvas.getContext('2d')!;
+      const font = '600 44px system-ui, sans-serif';
+      ctx.font = font;
+      const textW = Math.min(480, ctx.measureText(label).width);
+      const x = (512 - textW) / 2;
+      ctx.fillStyle = 'rgba(5, 8, 14, 0.72)';
+      ctx.beginPath();
+      ctx.roundRect(x - 18, 14, textW + 36, 68, 14);
+      ctx.fill();
+      ctx.fillStyle = factionCss;
+      ctx.fillRect(x - 18, 14, 5, 68);
+      ctx.fillStyle = '#f0e8d4';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, 256, 50);
+      texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      BattleView.labelTextures.set(label, texture);
+    }
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }),
+    );
+    sprite.userData.classAccessory = true;
+    return sprite;
   }
 
   private hullOf(counts: Record<ShipId, number>): number {
@@ -303,6 +529,17 @@ export class BattleView {
       const base = positions.get(item.group);
       if (!base) continue;
       const profile = visualProfileFor(item.cls);
+      // Per-class signature: role-true primitive marker + name plate, so the
+      // thirteen hulls (and custom designs on shared GLBs) read as distinct
+      // silhouettes in the line-up, not just as faction-tinted variants.
+      const size = (item.group.userData.size as THREE.Vector3 | undefined) ?? new THREE.Vector3(4, 2, profile.length);
+      const faction = new THREE.Color(item.side === 'a' ? colorA : colorB);
+      const accent = new THREE.Color(CLASS_ACCENT[profile.accessory] ?? 0xffd27a).lerp(faction, 0.35);
+      item.group.add(buildClassAccessory(profile.accessory, size, accent, faction));
+      const label = this.classLabelSprite(item.cls, item.side === 'a' ? colorA : colorB);
+      label.position.set(0, size.y * 0.5 + 4.2, 0);
+      label.scale.set(12, 2.25, 1);
+      item.group.add(label);
       item.group.position.copy(base);
       // Both lines face each other along Z, turned slightly toward the camera
       // so the hull profiles and superstructures stay readable.

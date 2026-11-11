@@ -112,6 +112,10 @@ export class GalaxyView {
   private downHit: PickResult | null = null;
 
   onPick: ((r: PickResult | null) => void) | null = null;
+  /** Fires on a double tap/click on the same system or fleet. */
+  onDoublePick: ((r: PickResult) => void) | null = null;
+  private lastTapHit: PickResult | null = null;
+  private lastTapAt = 0;
   onHover: ((r: PickResult | null) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, labelHost: HTMLElement) {
@@ -576,7 +580,8 @@ export class GalaxyView {
       /* pointer may already be gone */
     }
     if (this.pointers.size === 0) {
-      const quick = performance.now() - this.downAt < (this.downPointer === 'touch' ? 450 : 500);
+      const nowMs = performance.now();
+      const quick = nowMs - this.downAt < (this.downPointer === 'touch' ? 450 : 500);
       const travel = Math.hypot(ev.clientX - this.downX, ev.clientY - this.downY);
       const tap = this.tapCandidate && this.moved < 8 && travel < 10 && quick;
       this.dragging = false;
@@ -586,6 +591,15 @@ export class GalaxyView {
         this.downHit = null;
         this.labels.classList.toggle('hovering', !!hit);
         this.onPick?.(hit);
+        // Double-tap on the same object: the caller decides what "zoom"
+        // means (system stage in main.ts).
+        if (hit && this.lastTapHit && hit.type === this.lastTapHit.type && hit.id === this.lastTapHit.id && nowMs - this.lastTapAt < 450) {
+          this.onDoublePick?.(hit);
+        }
+        if (hit) {
+          this.lastTapHit = hit;
+          this.lastTapAt = nowMs;
+        }
       } else {
         this.downHit = null;
       }

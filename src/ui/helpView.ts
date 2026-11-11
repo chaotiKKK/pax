@@ -22,14 +22,17 @@ export function helpContentHtml(volume: { music: number; sfx: number }): string 
       </div>
       <div>
         <h4>Flotten</h4>
-        <p>Wähle eine Flotte im Sektor und drücke <b>Ziel</b>, dann klicke den Zielsektor. Jede Lane kostet mindestens einen Zyklus; langsame Rümpfe brauchen zwei.</p>
+        <p>Im Register <b>Flotten</b> siehst du jede eigene Flotte mit Schiffen, Hülle und Route. <b>Kurs setzen</b> und dann einen Zielsektor anklicken; <b>Halten</b> stoppt die Flotte. Jede Lane kostet mindestens einen Zyklus; langsame Rümpfe brauchen zwei.</p>
+        <h4>Planeten & System</h4>
+        <p>Einen Planeten anklicken zoomt die Sektoransicht heran (Nahansicht). Leere Fläche, Mausrad oder Esc geht zurück. <b>⛶ Zentral</b> (oder Doppelklick auf einen Stern) vergrößert das System auf die volle Bühne.</p>
         <h4>Krieg</h4>
         <p>Gefechte laufen automatisch, sobald verfeindete Flotten im selben System stehen. Wer den Orbit hält, kann eine feindliche Kolonie belagern — die Invasion läuft über mehrere Zyklen.</p>
         <h4>Tastatur</h4>
         <ul>
           <li><b>Leertaste</b> — Zyklus beenden</li>
-          <li><b>Esc</b> — Pause-Menü öffnen / Auswahl aufheben</li>
-          <li><b>1–4</b> — Registerkarten</li>
+          <li><b>Esc</b> — Nahansicht → zentrale Ansicht → Pause-Menü</li>
+          <li><b>1–5</b> — Registerkarten (Sektor, Flotten, Reich, Forschung, Diplomatie)</li>
+          <li><b>F5 / F9</b> — speichern / laden</li>
         </ul>
         <h4>Audio</h4>
         <div class="audio-controls">
