@@ -1,6 +1,7 @@
 {
   "meta": {
     "generator": "tools/audio/generate.py",
+    "kenneySfx": "Kenney Sci-Fi Sounds 1.0 + Interface Sounds 1.0 (CC0, kenney.nl) via tools/audio/import_kenney.py",
     "music": "OGG Vorbis q4, 44.1 kHz stereo; supplied MP3 ambience, 48 kHz stereo",
     "original": false,
     "sampleRate": 44100,
@@ -208,14 +209,14 @@
       }
     },
     "title": {
-      "name": "Deep Sub-Bass Drones",
-      "bpm": 78,
       "bars": 12,
-      "loop": true,
+      "bpm": 78,
       "gainDb": -1,
+      "loop": true,
+      "name": "Deep Sub-Bass Drones",
       "stems": {
-        "main": "music/title.ogg",
-        "ambience": "music/deep-sub-bass-drones.mp3"
+        "ambience": "music/deep-sub-bass-drones.mp3",
+        "main": "music/title.ogg"
       }
     },
     "victory": {
@@ -255,7 +256,9 @@
       "bus": "sfx",
       "cooldownMs": 0,
       "files": [
-        "sfx/build_complete.wav"
+        "sfx/build_complete.wav",
+        "sfx/build_complete_kenney_1.wav",
+        "sfx/build_complete_kenney_2.wav"
       ],
       "gainDb": -8
     },
@@ -367,8 +370,10 @@
       "bus": "sfx",
       "cooldownMs": 180,
       "files": [
-        "sfx/explosion_large_1.wav",
-        "sfx/explosion_large_2.wav"
+        "sfx/explosion_large_kenney_1.wav",
+        "sfx/explosion_large_kenney_2.wav",
+        "sfx/explosion_large_kenney_3.wav",
+        "sfx/explosion_large_kenney_4.wav"
       ],
       "gainDb": -3
     },
@@ -376,8 +381,8 @@
       "bus": "sfx",
       "cooldownMs": 120,
       "files": [
-        "sfx/explosion_small_1.wav",
-        "sfx/explosion_small_2.wav"
+        "sfx/explosion_small_kenney_1.wav",
+        "sfx/explosion_small_kenney_2.wav"
       ],
       "gainDb": -5
     },
@@ -385,7 +390,11 @@
       "bus": "sfx",
       "cooldownMs": 0,
       "files": [
-        "sfx/fleet_select.wav"
+        "sfx/fleet_select.wav",
+        "sfx/fleet_select_kenney_1.wav",
+        "sfx/fleet_select_kenney_2.wav",
+        "sfx/fleet_select_kenney_3.wav",
+        "sfx/fleet_select_kenney_4.wav"
       ],
       "gainDb": -10
     },
@@ -393,8 +402,11 @@
       "bus": "sfx",
       "cooldownMs": 55,
       "files": [
-        "sfx/impact_hull_1.wav",
-        "sfx/impact_hull_2.wav"
+        "sfx/impact_hull_kenney_1.wav",
+        "sfx/impact_hull_kenney_2.wav",
+        "sfx/impact_hull_kenney_3.wav",
+        "sfx/impact_hull_kenney_4.wav",
+        "sfx/impact_hull_kenney_5.wav"
       ],
       "gainDb": -5
     },
@@ -402,8 +414,11 @@
       "bus": "sfx",
       "cooldownMs": 55,
       "files": [
-        "sfx/impact_shield_1.wav",
-        "sfx/impact_shield_2.wav"
+        "sfx/impact_shield_kenney_1.wav",
+        "sfx/impact_shield_kenney_2.wav",
+        "sfx/impact_shield_kenney_3.wav",
+        "sfx/impact_shield_kenney_4.wav",
+        "sfx/impact_shield_kenney_5.wav"
       ],
       "gainDb": -7
     },
@@ -411,7 +426,11 @@
       "bus": "sfx",
       "cooldownMs": 0,
       "files": [
-        "sfx/insufficient.wav"
+        "sfx/insufficient.wav",
+        "sfx/insufficient_kenney_1.wav",
+        "sfx/insufficient_kenney_2.wav",
+        "sfx/insufficient_kenney_3.wav",
+        "sfx/insufficient_kenney_4.wav"
       ],
       "gainDb": -11
     },
@@ -443,7 +462,10 @@
       "bus": "sfx",
       "cooldownMs": 0,
       "files": [
-        "sfx/planet_select.wav"
+        "sfx/planet_select.wav",
+        "sfx/planet_select_kenney_1.wav",
+        "sfx/planet_select_kenney_2.wav",
+        "sfx/planet_select_kenney_3.wav"
       ],
       "gainDb": -11
     },
@@ -451,7 +473,9 @@
       "bus": "sfx",
       "cooldownMs": 0,
       "files": [
-        "sfx/research_complete.wav"
+        "sfx/research_complete.wav",
+        "sfx/research_complete_kenney_1.wav",
+        "sfx/research_complete_kenney_2.wav"
       ],
       "gainDb": -8
     },
@@ -467,7 +491,9 @@
       "bus": "sfx",
       "cooldownMs": 0,
       "files": [
-        "sfx/ship_complete.wav"
+        "sfx/ship_complete.wav",
+        "sfx/ship_complete_kenney_1.wav",
+        "sfx/ship_complete_kenney_2.wav"
       ],
       "gainDb": -8
     },
@@ -483,7 +509,10 @@
       "bus": "ui",
       "cooldownMs": 30,
       "files": [
-        "sfx/swatch.wav"
+        "sfx/swatch.wav",
+        "sfx/swatch_kenney_1.wav",
+        "sfx/swatch_kenney_2.wav",
+        "sfx/swatch_kenney_3.wav"
       ],
       "gainDb": -13
     },
@@ -491,7 +520,11 @@
       "bus": "sfx",
       "cooldownMs": 0,
       "files": [
-        "sfx/sys_select.wav"
+        "sfx/sys_select.wav",
+        "sfx/sys_select_kenney_1.wav",
+        "sfx/sys_select_kenney_2.wav",
+        "sfx/sys_select_kenney_3.wav",
+        "sfx/sys_select_kenney_4.wav"
       ],
       "gainDb": -11
     },
@@ -499,7 +532,11 @@
       "bus": "sfx",
       "cooldownMs": 0,
       "files": [
-        "sfx/target_lock.wav"
+        "sfx/target_lock.wav",
+        "sfx/target_lock_kenney_1.wav",
+        "sfx/target_lock_kenney_2.wav",
+        "sfx/target_lock_kenney_3.wav",
+        "sfx/target_lock_kenney_4.wav"
       ],
       "gainDb": -9
     },
@@ -508,7 +545,12 @@
       "cooldownMs": 28,
       "files": [
         "sfx/ui_click_1.wav",
-        "sfx/ui_click_2.wav"
+        "sfx/ui_click_2.wav",
+        "sfx/ui_click_kenney_1.wav",
+        "sfx/ui_click_kenney_2.wav",
+        "sfx/ui_click_kenney_3.wav",
+        "sfx/ui_click_kenney_4.wav",
+        "sfx/ui_click_kenney_5.wav"
       ],
       "gainDb": -14
     },
@@ -516,7 +558,11 @@
       "bus": "ui",
       "cooldownMs": 0,
       "files": [
-        "sfx/ui_close.wav"
+        "sfx/ui_close.wav",
+        "sfx/ui_close_kenney_1.wav",
+        "sfx/ui_close_kenney_2.wav",
+        "sfx/ui_close_kenney_3.wav",
+        "sfx/ui_close_kenney_4.wav"
       ],
       "gainDb": -12
     },
@@ -524,7 +570,11 @@
       "bus": "ui",
       "cooldownMs": 0,
       "files": [
-        "sfx/ui_confirm.wav"
+        "sfx/ui_confirm.wav",
+        "sfx/ui_confirm_kenney_1.wav",
+        "sfx/ui_confirm_kenney_2.wav",
+        "sfx/ui_confirm_kenney_3.wav",
+        "sfx/ui_confirm_kenney_4.wav"
       ],
       "gainDb": -11
     },
@@ -532,7 +582,11 @@
       "bus": "ui",
       "cooldownMs": 0,
       "files": [
-        "sfx/ui_deny.wav"
+        "sfx/ui_deny.wav",
+        "sfx/ui_deny_kenney_1.wav",
+        "sfx/ui_deny_kenney_2.wav",
+        "sfx/ui_deny_kenney_3.wav",
+        "sfx/ui_deny_kenney_4.wav"
       ],
       "gainDb": -11
     },
@@ -540,7 +594,11 @@
       "bus": "ui",
       "cooldownMs": 0,
       "files": [
-        "sfx/ui_open.wav"
+        "sfx/ui_open.wav",
+        "sfx/ui_open_kenney_1.wav",
+        "sfx/ui_open_kenney_2.wav",
+        "sfx/ui_open_kenney_3.wav",
+        "sfx/ui_open_kenney_4.wav"
       ],
       "gainDb": -12
     },
@@ -548,7 +606,12 @@
       "bus": "ui",
       "cooldownMs": 40,
       "files": [
-        "sfx/ui_tab.wav"
+        "sfx/ui_tab.wav",
+        "sfx/ui_tab_kenney_1.wav",
+        "sfx/ui_tab_kenney_2.wav",
+        "sfx/ui_tab_kenney_3.wav",
+        "sfx/ui_tab_kenney_4.wav",
+        "sfx/ui_tab_kenney_5.wav"
       ],
       "gainDb": -13
     },
@@ -556,7 +619,11 @@
       "bus": "ui",
       "cooldownMs": 0,
       "files": [
-        "sfx/ui_toggle_off.wav"
+        "sfx/ui_toggle_off.wav",
+        "sfx/ui_toggle_off_kenney_1.wav",
+        "sfx/ui_toggle_off_kenney_2.wav",
+        "sfx/ui_toggle_off_kenney_3.wav",
+        "sfx/ui_toggle_off_kenney_4.wav"
       ],
       "gainDb": -12
     },
@@ -564,7 +631,11 @@
       "bus": "ui",
       "cooldownMs": 0,
       "files": [
-        "sfx/ui_toggle_on.wav"
+        "sfx/ui_toggle_on.wav",
+        "sfx/ui_toggle_on_kenney_1.wav",
+        "sfx/ui_toggle_on_kenney_2.wav",
+        "sfx/ui_toggle_on_kenney_3.wav",
+        "sfx/ui_toggle_on_kenney_4.wav"
       ],
       "gainDb": -12
     },
@@ -572,8 +643,11 @@
       "bus": "sfx",
       "cooldownMs": 70,
       "files": [
-        "sfx/weapon_kinetic_1.wav",
-        "sfx/weapon_kinetic_2.wav"
+        "sfx/weapon_kinetic_kenney_1.wav",
+        "sfx/weapon_kinetic_kenney_2.wav",
+        "sfx/weapon_kinetic_kenney_3.wav",
+        "sfx/weapon_kinetic_kenney_4.wav",
+        "sfx/weapon_kinetic_kenney_5.wav"
       ],
       "gainDb": -6
     },
@@ -581,8 +655,11 @@
       "bus": "sfx",
       "cooldownMs": 90,
       "files": [
-        "sfx/weapon_missile_1.wav",
-        "sfx/weapon_missile_2.wav"
+        "sfx/weapon_missile_kenney_1.wav",
+        "sfx/weapon_missile_kenney_2.wav",
+        "sfx/weapon_missile_kenney_3.wav",
+        "sfx/weapon_missile_kenney_4.wav",
+        "sfx/weapon_missile_kenney_5.wav"
       ],
       "gainDb": -6
     },
@@ -590,8 +667,11 @@
       "bus": "sfx",
       "cooldownMs": 65,
       "files": [
-        "sfx/weapon_pulse_1.wav",
-        "sfx/weapon_pulse_2.wav"
+        "sfx/weapon_pulse_kenney_1.wav",
+        "sfx/weapon_pulse_kenney_2.wav",
+        "sfx/weapon_pulse_kenney_3.wav",
+        "sfx/weapon_pulse_kenney_4.wav",
+        "sfx/weapon_pulse_kenney_5.wav"
       ],
       "gainDb": -8
     }

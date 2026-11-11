@@ -9,6 +9,10 @@ encoding.
 Usage:
     python tools/audio/generate.py            # generate all assets
     python tools/audio/generate.py --sfx-only # iterate on sound effects
+
+Sound effects then gain Kenney CC0 recordings (see import_kenney.py):
+    python tools/audio/import_kenney.py
+    python tools/audio/audit.py
 """
 from __future__ import annotations
 
